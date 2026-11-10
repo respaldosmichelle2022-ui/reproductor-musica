@@ -1,0 +1,9 @@
+# Llaves y secretos: NUNCA se suben
+.env
+**/.env
+
+# Dependencias y compilados
+node_modules/
+frontend/dist/
+.b2venv/
+

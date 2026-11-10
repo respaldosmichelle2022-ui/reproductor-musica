@@ -1,0 +1,20 @@
+{
+  "name": "music-player-backend",
+  "version": "1.0.0",
+  "description": "API para el reproductor de música (MP3, Spotify, YouTube)",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-fetch": "^3.3.2",
+    "yt-search": "^2.13.1"
+  }
+}
