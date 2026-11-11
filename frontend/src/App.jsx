@@ -522,29 +522,54 @@ export default function App() {
                   <span className="video-folder-badge">📁 {currentVideoNube.carpeta}</span>
                 </div>
                 <div className="video-actions">
-                  <button className="btn-fullscreen-native" onClick={pantallaCompletaVideo}>
-                    ⛶ Pantalla Completa
-                  </button>
-                  <a
-                    href={currentVideoNube.url}
-                    download={currentVideoNube.archivo}
-                    className="btn-download-link"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    ⬇️ Descargar
-                  </a>
+                  {currentVideoNube.tipo !== 'youtube' ? (
+                    <>
+                      <button className="btn-fullscreen-native" onClick={pantallaCompletaVideo}>
+                        ⛶ Pantalla Completa
+                      </button>
+                      <a
+                        href={currentVideoNube.url}
+                        download={currentVideoNube.archivo}
+                        className="btn-download-link"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        ⬇️ Descargar
+                      </a>
+                    </>
+                  ) : (
+                    <a
+                      href={currentVideoNube.url}
+                      className="btn-download-link"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      ↗ Ver en YouTube
+                    </a>
+                  )}
                 </div>
               </div>
-              <video
-                ref={videoNubeRef}
-                controls
-                autoPlay
-                playsInline
-                preload="metadata"
-                className="cloud-video-element"
-                src={currentVideoNube.url}
-              />
+              {currentVideoNube.tipo === 'youtube' ? (
+                <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden' }}>
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${currentVideoNube.youtubeId}?autoplay=1&rel=0`}
+                    title={currentVideoNube.titulo}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+                  />
+                </div>
+              ) : (
+                <video
+                  ref={videoNubeRef}
+                  controls
+                  autoPlay
+                  playsInline
+                  preload="metadata"
+                  className="cloud-video-element"
+                  src={currentVideoNube.url}
+                />
+              )}
             </div>
           )}
 
@@ -561,7 +586,18 @@ export default function App() {
                   onClick={() => reproducirVideoNube(v)}
                 >
                   <div className="video-card-thumb">
-                    <span className="video-play-icon">▶</span>
+                    {v.tipo === 'youtube' ? (
+                      <>
+                        <img
+                          src={`https://img.youtube.com/vi/${v.youtubeId}/hqdefault.jpg`}
+                          alt={v.titulo}
+                          className="video-card-thumb-img"
+                        />
+                        <span className="badge-youtube-card">▶ YouTube</span>
+                      </>
+                    ) : (
+                      <span className="video-play-icon">▶</span>
+                    )}
                   </div>
                   <div className="video-card-info">
                     <h4>{v.titulo}</h4>
