@@ -138,7 +138,11 @@ if (fs.existsSync(DIST)) {
   app.use(express.static(DIST));
 }
 
-app.listen(PORT, () => {
-  console.log(`⚡️ Backend escuchando en http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`⚡️ Backend escuchando en http://localhost:${PORT}`);
+  });
+}
+
+export default app;
 
