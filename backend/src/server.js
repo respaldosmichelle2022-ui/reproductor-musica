@@ -152,7 +152,7 @@ app.get(['/callback', '/api/callback'], async (req, res) => {
       console.error('Spotify token error:', data);
       return res.status(400).send(`Error de Spotify: ${data.error_description || JSON.stringify(data)}`);
     }
-    const destino = process.env.FRONTEND_URL || (fs.existsSync(DIST) ? '/' : 'http://localhost:5173/');
+    const destino = process.env.FRONTEND_URL || '/';
     res.redirect(`${destino}#spotify_token=${encodeURIComponent(data.access_token)}&refresh_token=${encodeURIComponent(data.refresh_token || '')}`);
   } catch (err) {
     console.error('Error en callback:', err);
