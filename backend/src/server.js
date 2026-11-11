@@ -22,11 +22,12 @@ const PORT = process.env.PORT || 8080;
 
 const TRACKS_JSON = path.resolve(__dirname, 'tracks.json');
 const TITLES_JSON = path.resolve(__dirname, 'track_titles.json');
+const DETALLE_JSON = path.resolve(__dirname, 'tracks_detalle.json');
 const VIDEOS_JSON = path.resolve(__dirname, 'videos.json');
 
 // Ruta para devolver URLs de MP3
 // Carpeta local de MP3 (se puede cambiar con MUSIC_DIR en .env)
-const MUSIC_DIR = process.env.MUSIC_DIR || 'C:\\Users\\Cord_Contraloria\\Downloads\\MUSICA MP3';
+const MUSIC_DIR = process.env.MUSIC_DIR || 'C:\\PROYECTOS\\REPRODUCTOR DE MUSICA\\CANCIONES MP3';
 app.use('/music', express.static(MUSIC_DIR));
 
 app.get('/api/mp3', async (req, res) => {
@@ -35,8 +36,22 @@ app.get('/api/mp3', async (req, res) => {
     try {
       const tracks = JSON.parse(fs.readFileSync(TRACKS_JSON, 'utf-8'));
       const titles = fs.existsSync(TITLES_JSON) ? JSON.parse(fs.readFileSync(TITLES_JSON, 'utf-8')) : {};
+      let detalle = fs.existsSync(DETALLE_JSON) ? JSON.parse(fs.readFileSync(DETALLE_JSON, 'utf-8')) : [];
+      if (!detalle || detalle.length === 0) {
+        detalle = tracks.map(url => ({
+          url,
+          titulo: titles[url] || 'Canción',
+          categoria: 'Colección Inicial'
+        }));
+      }
+      const setCats = new Set(['Todas']);
+      detalle.forEach(d => {
+        if (d.categoria) setCats.add(d.categoria);
+      });
+      const categorias = Array.from(setCats);
+
       if (Array.isArray(tracks) && tracks.length > 0) {
-        return res.json({ tracks, titles });
+        return res.json({ tracks, titles, categorias, tracksDetalle: detalle });
       }
     } catch (e) {
       console.error('Error leyendo tracks.json:', e.message);

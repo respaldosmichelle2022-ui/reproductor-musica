@@ -10,6 +10,9 @@ export default function App() {
   // Audios Nube
   const [mp3Tracks, setMp3Tracks] = useState([]);
   const [titulosMP3, setTitulosMP3] = useState({});
+  const [tracksDetalle, setTracksDetalle] = useState([]);
+  const [categoriasMusica, setCategoriasMusica] = useState(['Todas']);
+  const [categoriaMusicaSeleccionada, setCategoriaMusicaSeleccionada] = useState('Todas');
   const [current, setCurrent] = useState('');
   const [filtro, setFiltro] = useState('');
   const [isShuffle, setIsShuffle] = useState(false);
@@ -69,7 +72,12 @@ export default function App() {
   };
 
   const listaActual = tab === 'favorites' ? favoritos : mp3Tracks;
-  const audiosVisibles = listaActual.filter(u => nombre(u).toLowerCase().includes(filtro.toLowerCase()));
+  const audiosFiltrados = listaActual.filter(u => {
+    if (tab !== 'cloud' || categoriaMusicaSeleccionada === 'Todas') return true;
+    const item = tracksDetalle.find(d => d.url === u);
+    return item ? item.categoria === categoriaMusicaSeleccionada : true;
+  });
+  const audiosVisibles = audiosFiltrados.filter(u => nombre(u).toLowerCase().includes(filtro.toLowerCase()));
 
   const moverAudio = d => {
     if (!audiosVisibles.length) return;
@@ -167,6 +175,8 @@ export default function App() {
         const tracks = r.data.tracks || [];
         setMp3Tracks(tracks);
         if (r.data.titles) setTitulosMP3(r.data.titles);
+        if (r.data.tracksDetalle) setTracksDetalle(r.data.tracksDetalle);
+        if (r.data.categorias) setCategoriasMusica(r.data.categorias);
         setCargandoMusica(false);
         if (tracks.length === 0 && reintentos > 0) {
           setTimeout(() => cargarMusica(reintentos - 1), 1500);
@@ -418,6 +428,22 @@ export default function App() {
               onChange={e => setFiltro(e.target.value)}
             />
           </div>
+
+          {/* Selector de Géneros / Carpetas (solo en Mi Música) */}
+          {tab === 'cloud' && categoriasMusica.length > 1 && (
+            <div className="folder-pills">
+              <span className="folder-label">Géneros:</span>
+              {categoriasMusica.map(c => (
+                <button
+                  key={c}
+                  className={`pill-btn ${categoriaMusicaSeleccionada === c ? 'active' : ''}`}
+                  onClick={() => setCategoriaMusicaSeleccionada(c)}
+                >
+                  🎵 {c}
+                </button>
+              ))}
+            </div>
+          )}
 
           {audiosVisibles.length === 0 ? (
             <p className="empty-notice">
