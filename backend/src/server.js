@@ -125,7 +125,7 @@ app.get('/api/spotify/login', (req, res) => {
   res.redirect(authUrl);
 });
 
-app.get('/callback', async (req, res) => {
+app.get(['/callback', '/api/callback'], async (req, res) => {
   const code = req.query.code;
   if (!code) {
     return res.redirect('/#spotify_error=access_denied');
