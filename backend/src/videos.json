@@ -5,44 +5,25 @@
   ],
   "videos": [
     {
-      "titulo": "LLORONA DOÑA LIZ",
+      "titulo": "MONSE BAILE",
       "carpeta": "VIERNES SOCIAL-2024",
-      "url": "https://github.com/respaldosmichelle2022-ui/reproductor-musica/releases/download/v1.0.0-videos/LLORONA_DO_A_LIZ.mp4"
+      "url": "https://www.youtube.com/watch?v=zbG5Jst-Qfk",
+      "youtubeId": "zbG5Jst-Qfk",
+      "tipo": "youtube"
     },
     {
       "titulo": "MAFER CANCION",
       "carpeta": "VIERNES SOCIAL-2024",
-      "url": "https://github.com/respaldosmichelle2022-ui/reproductor-musica/releases/download/v1.0.0-videos/MAFER_CANCION.mp4"
+      "url": "https://www.youtube.com/watch?v=gZqz6nrOnoA",
+      "youtubeId": "gZqz6nrOnoA",
+      "tipo": "youtube"
     },
     {
-      "titulo": "MONSE BAILE",
+      "titulo": "LLORONA DOÑA LIZ",
       "carpeta": "VIERNES SOCIAL-2024",
-      "url": "https://github.com/respaldosmichelle2022-ui/reproductor-musica/releases/download/v1.0.0-videos/MONSE_BAILE.mp4"
-    },
-    {
-      "titulo": "TERESITA 1",
-      "carpeta": "VIERNES SOCIAL-2024",
-      "url": "https://github.com/respaldosmichelle2022-ui/reproductor-musica/releases/download/v1.0.0-videos/TERESITA_1.mp4"
-    },
-    {
-      "titulo": "TERESITA 2",
-      "carpeta": "VIERNES SOCIAL-2024",
-      "url": "https://github.com/respaldosmichelle2022-ui/reproductor-musica/releases/download/v1.0.0-videos/TERESITA_2.mp4"
-    },
-    {
-      "titulo": "VID_20220930_160006",
-      "carpeta": "VIERNES SOCIAL-2024",
-      "url": "https://github.com/respaldosmichelle2022-ui/reproductor-musica/releases/download/v1.0.0-videos/VID_20220930_160006.mp4"
-    },
-    {
-      "titulo": "VID_20220930_160137",
-      "carpeta": "VIERNES SOCIAL-2024",
-      "url": "https://github.com/respaldosmichelle2022-ui/reproductor-musica/releases/download/v1.0.0-videos/VID_20220930_160137.mp4"
-    },
-    {
-      "titulo": "VID_20220930_161227",
-      "carpeta": "VIERNES SOCIAL-2024",
-      "url": "https://github.com/respaldosmichelle2022-ui/reproductor-musica/releases/download/v1.0.0-videos/VID_20220930_161227.mp4"
+      "url": "https://www.youtube.com/watch?v=O1Q75ezM-oM",
+      "youtubeId": "O1Q75ezM-oM",
+      "tipo": "youtube"
     }
   ]
 }
