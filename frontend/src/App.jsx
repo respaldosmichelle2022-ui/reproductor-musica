@@ -52,6 +52,8 @@ export default function App() {
   const [spotifyInput, setSpotifyInput] = useState('');
   const [spotifyPlayerDeviceId, setSpotifyPlayerDeviceId] = useState('');
   const spotifyPlayerRef = useRef(null);
+  const [spotifyError, setSpotifyError] = useState('');
+  const [portadasPL, setPortadasPL] = useState({});
 
   // Búsqueda general
   const [search, setSearch] = useState('');
@@ -281,6 +283,17 @@ export default function App() {
     }
   }, [currentVideo, modoRadioYT]);
 
+  // Portadas de playlists recomendadas vía oEmbed público de Spotify (sin login)
+  useEffect(() => {
+    PLAYLISTS_SPOTIFY_RECOMENDADAS.forEach(pl => {
+      axios.get('https://open.spotify.com/oembed', { params: { url: `https://open.spotify.com/playlist/${pl.id}` } })
+        .then(r => {
+          if (r.data?.thumbnail_url) setPortadasPL(prev => ({ ...prev, [pl.id]: r.data.thumbnail_url }));
+        })
+        .catch(() => {});
+    });
+  }, []);
+
   // --- SPOTIFY: Autenticación, SDK y Funciones ---
   useEffect(() => {
     // Revisar si volvemos del login de Spotify en el hash
@@ -307,13 +320,31 @@ export default function App() {
     }
 
     // 1. Perfil del usuario
+    setSpotifyError('');
     axios.get('https://api.spotify.com/v1/me', {
       headers: { Authorization: `Bearer ${spotifyToken}` }
     }).then(r => {
       setSpotifyUser(r.data);
-    }).catch(err => {
-      if (err.response && err.response.status === 401) {
+    }).catch(async err => {
+      const status = err.response?.status;
+      const msg = err.response?.data?.error?.message || err.message;
+      if (status === 401) {
+        // Token vencido: intentar renovarlo con el refresh_token
+        const refresh = localStorage.getItem('spotify_refresh_token');
+        if (refresh) {
+          try {
+            const rr = await axios.get(`${API}/api/spotify/refresh_token`, { params: { refresh_token: refresh } });
+            if (rr.data?.access_token) {
+              localStorage.setItem('spotify_token', rr.data.access_token);
+              if (rr.data.refresh_token) localStorage.setItem('spotify_refresh_token', rr.data.refresh_token);
+              setSpotifyToken(rr.data.access_token);
+              return;
+            }
+          } catch {}
+        }
         cerrarSesionSpotify();
+      } else {
+        setSpotifyError(`Spotify respondió ${status || ''}: ${msg}`);
       }
     });
 
@@ -402,22 +433,23 @@ export default function App() {
 
   const buscarSpotify = async () => {
     if (!spotifySearchQuery.trim()) return;
+    if (!spotifyToken) {
+      setSpotifyError('Para buscar canciones primero debes iniciar sesión con Spotify (botón verde de arriba).');
+      return;
+    }
     setSpotifyBuscando(true);
+    setSpotifyError('');
     try {
-      if (spotifyToken) {
-        const r = await axios.get('https://api.spotify.com/v1/search', {
-          params: { q: spotifySearchQuery, type: 'track,playlist', limit: 10 },
-          headers: { Authorization: `Bearer ${spotifyToken}` }
-        });
-        setSpotifySearchResults(r.data);
-      } else {
-        const r = await axios.get(`${API}/api/spotify/search`, {
-          params: { q: spotifySearchQuery }
-        });
-        setSpotifySearchResults(r.data);
-      }
+      const r = await axios.get('https://api.spotify.com/v1/search', {
+        params: { q: spotifySearchQuery, type: 'track,playlist', limit: 10 },
+        headers: { Authorization: `Bearer ${spotifyToken}` }
+      });
+      setSpotifySearchResults(r.data);
     } catch (e) {
       console.error('Error buscando en Spotify:', e);
+      const status = e.response?.status;
+      const msg = e.response?.data?.error?.message || e.message;
+      setSpotifyError(`La búsqueda falló (${status || 'sin conexión'}): ${msg}`);
     }
     setSpotifyBuscando(false);
   };
@@ -865,6 +897,12 @@ export default function App() {
             </div>
           </div>
 
+          {spotifyError && (
+            <div style={{ background: '#3a1a1a', border: '1px solid #e22134', color: '#ffb3b3', borderRadius: 8, padding: '10px 14px', margin: '10px 0', fontSize: 14 }}>
+              ⚠️ {spotifyError}
+            </div>
+          )}
+
           {/* Subpestañas estilo Spotify */}
           <div className="spotify-nav-pills">
             <button
@@ -923,7 +961,7 @@ export default function App() {
                     onClick={() => reproducirContextoSpotify(pl.id, 'playlist')}
                   >
                     <div className="spotify-card-cover-wrap">
-                      <img src={pl.img} alt={pl.titulo} className="spotify-card-img" />
+                      <img src={portadasPL[pl.id] || pl.img} alt={pl.titulo} className="spotify-card-img" />
                       <button className="spotify-play-hover-btn" title="Reproducir en Spotify">
                         ▶
                       </button>
