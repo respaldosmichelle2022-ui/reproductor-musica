@@ -9,6 +9,7 @@ export default function App() {
   
   // Audios Nube
   const [mp3Tracks, setMp3Tracks] = useState([]);
+  const [titulosMP3, setTitulosMP3] = useState({});
   const [current, setCurrent] = useState('');
   const [filtro, setFiltro] = useState('');
   const [isShuffle, setIsShuffle] = useState(false);
@@ -49,8 +50,10 @@ export default function App() {
   const ytPlayerRef = useRef(null);
 
   const nombre = url => {
+    if (titulosMP3 && titulosMP3[url]) return titulosMP3[url];
     const sinParametros = url.split('?')[0];
-    return decodeURIComponent(sinParametros.split('/').pop()).replace(/\.mp3$/i, '');
+    let n = decodeURIComponent(sinParametros.split('/').pop()).replace(/\.mp3$/i, '');
+    return n.replace(/_/g, ' ').trim();
   };
 
   const toggleFavorito = (url, e) => {
@@ -163,6 +166,7 @@ export default function App() {
       .then(r => {
         const tracks = r.data.tracks || [];
         setMp3Tracks(tracks);
+        if (r.data.titles) setTitulosMP3(r.data.titles);
         setCargandoMusica(false);
         if (tracks.length === 0 && reintentos > 0) {
           setTimeout(() => cargarMusica(reintentos - 1), 1500);
@@ -395,7 +399,7 @@ export default function App() {
         <section className="section-content">
           <div className="section-header">
             <div className="section-title-row">
-              <h2>{tab === 'cloud' ? 'Canciones en la nube Backblaze' : 'Mis Canciones Favoritas'}</h2>
+              <h2>{tab === 'cloud' ? 'Canciones en la Nube' : 'Mis Canciones Favoritas'}</h2>
               {tab === 'cloud' && (
                 <button
                   className="btn-refresh-small"
@@ -453,7 +457,7 @@ export default function App() {
       {tab === 'videos_nube' && (
         <section className="section-content">
           <div className="section-header">
-            <h2>Videos en la Nube Backblaze</h2>
+            <h2>🎬 Mis Videos en la Nube</h2>
           </div>
 
           {/* Selector de Carpetas */}

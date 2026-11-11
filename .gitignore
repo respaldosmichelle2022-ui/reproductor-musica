@@ -1,6 +1,7 @@
 # Llaves y secretos: NUNCA se suben
 .env
 **/.env
+scripts/
 
 # Dependencias y compilados
 node_modules/
