@@ -1,41 +1,43 @@
-# Reproductor de Música
+# Reproductor Multimedia en la Nube 🎵🎬
 
-Página web que reproduce tus MP3 y está preparada para buscar en YouTube y Spotify.
+Plataforma multimedia moderna alojada 24/7 en la nube (Vercel) con streaming ilimitado sin costo ni tarjetas.
 
-## Estructura
-- `backend/`: servidor Node/Express. Lista y sirve los MP3, y hace de intermediario con YouTube y Spotify.
-- `frontend/`: página React + Vite (reproductor, lista, filtro, anterior/siguiente).
-- `subir-a-backblaze.ps1`: sube tus MP3 a Backblaze B2 (plan gratis, 10 GB).
-- `subir-a-la-nube.ps1`: alternativa para Google Cloud Storage (requiere facturación).
+- **URL de Producción:** [https://reproductor-musica-sigma.vercel.app](https://reproductor-musica-sigma.vercel.app)
+- **Repositorio GitHub:** [https://github.com/respaldosmichelle2022-ui/reproductor-musica](https://github.com/respaldosmichelle2022-ui/reproductor-musica)
 
-## Ejecutar en local
-Abre dos terminales de PowerShell:
+---
 
-```powershell
-# Terminal 1: servidor (http://localhost:8080)
-cd "c:\PROYECTOS\REPRODUCTOR DE MUSICA\music-player\backend"
-npm run dev
+## 🚀 Características Principales
 
-# Terminal 2: página (http://localhost:5173)
-cd "c:\PROYECTOS\REPRODUCTOR DE MUSICA\music-player\frontend"
-npm run dev
-```
+1. **☁️ Mi Música (MP3)**:
+   - 113 canciones alojadas en GitHub Releases (`v1.0.0-musica`) con streaming continuo `HTTP 206`.
+   - Soporte para subcarpetas por géneros musicales (`ROMANTICAS`, `GRUPERAS`, `BALADAS`, etc.).
+   - Modo aleatorio (Shuffle), repetir y lista persistente de Favoritas (❤️).
 
-El servidor lee los MP3 de `C:\Users\Cord_Contraloria\Music\MUSICA MP3`. Puedes cambiar la carpeta con `MUSIC_DIR` en `backend\.env`.
+2. **🎬 Mis Videos (Eventos)**:
+   - Videos locales en calidad original intacta (1080p Full HD) en GitHub Releases (`v1.0.0-videos`).
+   - Soporte para **videos de YouTube en modo no listado/oculto** (hasta 256 GB / 12 horas por video sin límites de disco).
+   - Clasificación por eventos con selector de carpetas (`VIERNES SOCIAL-2024`, `POSADA-2026`, etc.).
 
-## Usar la música desde la nube (Backblaze B2)
-1. Crea un bucket **público** y una llave de aplicación en backblaze.com.
-2. Sube la música:
-   ```powershell
-   cd "c:\PROYECTOS\REPRODUCTOR DE MUSICA\music-player"
-   powershell -ExecutionPolicy Bypass -File .\subir-a-backblaze.ps1 -KeyId "KEYID" -AppKey "APPLICATIONKEY" -Bucket "BUCKET"
-   ```
-3. En `backend\.env` agrega `MUSIC_BASE_URL` con la dirección pública de la carpeta `musica` de tu bucket.
-4. Reinicia el servidor.
+3. **▶ YouTube con Radio Automático**:
+   - Búsqueda sin API keys ni facturación (cero cuotas de Google).
+   - Sugerencias automáticas en la pantalla de inicio.
+   - Modo Radio continuo inteligente: al terminar una canción sigue reproduciendo recomendaciones similares sin repetir versiones.
+   - Detección de enlaces directos de YouTube en el buscador.
 
-## Claves pendientes (`backend\.env`, copia de `.env.example`)
-- `YOUTUBE_API_KEY`: para buscar en YouTube.
-- `SPOTIFY_CLIENT_ID` y `SPOTIFY_CLIENT_SECRET`: para Spotify. Reproducir canciones completas requiere cuenta Premium.
+4. **🟢 Spotify**:
+   - Integración para reproducir listas, álbumes y pistas de Spotify.
 
-Nunca compartas ni subas a un repositorio el archivo `.env` ni las llaves.
+---
 
+## 📁 Cómo Agregar Nuevo Contenido (100% Autónomo)
+
+En la carpeta principal `C:\PROYECTOS\REPRODUCTOR DE MUSICA\`:
+
+1. **Para Música**: Pega tus archivos `.mp3` en `CANCIONES MP3` (puedes crear subcarpetas por género).
+2. **Para Videos**:
+   - Pega tus archivos `.mp4` en `VIDEOS` (creando subcarpetas por evento).
+   - O agrega enlaces de YouTube en `VIDEOS\ENLACES_YOUTUBE.txt` o en notas `.txt` dentro de la subcarpeta del evento.
+3. **Ejecuta `SUBIR_CONTENIDO_A_LA_NUBE.bat`**:
+   - Detecta automáticamente lo nuevo, lo sube a la nube y actualiza Vercel al instante.
+   - Una vez subido, puedes borrar los archivos locales si deseas liberar espacio en tu disco duro.
