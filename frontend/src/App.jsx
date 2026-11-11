@@ -320,12 +320,16 @@ export default function App() {
     }
 
     // 1. Perfil del usuario
+    let cancelado = false; // evita que respuestas de un token viejo pisen al nuevo
     setSpotifyError('');
     axios.get('https://api.spotify.com/v1/me', {
       headers: { Authorization: `Bearer ${spotifyToken}` }
     }).then(r => {
+      if (cancelado) return;
       setSpotifyUser(r.data);
+      setSpotifyError('');
     }).catch(async err => {
+      if (cancelado) return;
       const status = err.response?.status;
       const msg = (typeof err.response?.data === 'string' ? err.response.data : (err.response?.data?.error?.message || (err.response?.data ? JSON.stringify(err.response.data) : err.message)));
       if (status === 401) {
@@ -352,6 +356,7 @@ export default function App() {
     axios.get('https://api.spotify.com/v1/me/playlists?limit=30', {
       headers: { Authorization: `Bearer ${spotifyToken}` }
     }).then(r => {
+      if (cancelado) return;
       setSpotifyUserPlaylists(r.data.items || []);
     }).catch(console.error);
 
@@ -387,6 +392,7 @@ export default function App() {
     }
 
     return () => {
+      cancelado = true;
       if (spotifyPlayerRef.current) {
         try { spotifyPlayerRef.current.disconnect(); } catch {}
         spotifyPlayerRef.current = null;
