@@ -5,12 +5,14 @@ import './App.css';
 const API = import.meta.env.DEV ? 'http://localhost:8080' : '';
 
 const PLAYLISTS_SPOTIFY_RECOMENDADAS = [
-  { id: '37i9dQZF1DX10zKzsJ2jva', titulo: 'Viva Latino', desc: 'Los mayores éxitos y lanzamientos de la música latina', img: 'https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da84b8d538e1247ee0ec5c331908' },
-  { id: '37i9dQZF1DXcBWIGoYBM5M', titulo: 'Today\'s Top Hits', desc: 'Lo más escuchado a nivel mundial en este momento', img: 'https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da849bb6af539d072de34548d15c' },
-  { id: '37i9dQZF1DWZo9T7uQ4oP7', titulo: 'Baladas Románticas', desc: 'Grandes canciones de amor y clásicos inolvidables', img: 'https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da847f6c387b337ceb69324aa867' },
-  { id: '37i9dQZF1DX8m36u1iGZ8L', titulo: 'Cumbias Inmortales', desc: 'El ritmo y sabor de las mejores cumbias para celebrar', img: 'https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da84166bb9a891be49be083dfd88' },
-  { id: '37i9dQZF1DX56b2WjR2x5I', titulo: 'Rock en Español 80s y 90s', desc: 'Los himnos del rock en español que marcaron historia', img: 'https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da84e2b96d92ec12933dd5ea0553' },
-  { id: '37i9dQZF1DWXRqgorJj26U', titulo: 'Rock Clásico', desc: 'Leyendas de la música y clásicos internacionales', img: 'https://image-cdn-ak.spotifycdn.com/image/ab67706c0000da84fc091f0cc3d37fb94b29381d' }
+  { id: '37i9dQZF1DX10zKzsJ2jva', titulo: 'Viva Latino', desc: 'Los mayores éxitos de la música latina', emoji: '🔥', color: 'linear-gradient(135deg, #ff4e50, #f9d423)' },
+  { id: '37i9dQZF1DXcBWIGoYBM5M', titulo: 'Today\'s Top Hits', desc: 'Lo más escuchado a nivel mundial', emoji: '🌎', color: 'linear-gradient(135deg, #8e2de2, #4a00e0)' },
+  { id: '37i9dQZF1DX8SfyqmSFDwe', titulo: 'Reggaetón Old School', desc: 'Los clásicos del reggaetón de siempre', emoji: '🎤', color: 'linear-gradient(135deg, #f12711, #f5af19)' },
+  { id: '37i9dQZF1DX2apWzyECwyZ', titulo: 'This Is Bad Bunny', desc: 'Lo esencial de Bad Bunny', emoji: '🐰', color: 'linear-gradient(135deg, #11998e, #38ef7d)' },
+  { id: '37i9dQZF1DX4UtSsGT1Sbe', titulo: 'Éxitos de los 80s', desc: 'Himnos que marcaron una década', emoji: '📼', color: 'linear-gradient(135deg, #fc466b, #3f5efb)' },
+  { id: '37i9dQZF1DXbTxeAdrVG2l', titulo: 'Éxitos de los 90s', desc: 'Los grandes hits de los noventa', emoji: '💿', color: 'linear-gradient(135deg, #00c6ff, #0072ff)' },
+  { id: '37i9dQZF1DWXRqgorJj26U', titulo: 'Rock Clásico', desc: 'Leyendas del rock internacional', emoji: '🎸', color: 'linear-gradient(135deg, #434343, #000000)' },
+  { id: '37i9dQZF1DWWMOmoXKqHTD', titulo: 'Para cantar en el carro', desc: 'Canciones para cantar a todo pulmón', emoji: '🚗', color: 'linear-gradient(135deg, #f7971e, #ffd200)' }
 ];
 
 export default function App() {
@@ -283,16 +285,39 @@ export default function App() {
     }
   }, [currentVideo, modoRadioYT]);
 
-  // Portadas de playlists recomendadas vía oEmbed público de Spotify (sin login)
+  // Búsqueda en vivo estilo Spotify: busca mientras escribes (con pequeña pausa)
   useEffect(() => {
-    PLAYLISTS_SPOTIFY_RECOMENDADAS.forEach(pl => {
-      axios.get('https://open.spotify.com/oembed', { params: { url: `https://open.spotify.com/playlist/${pl.id}` } })
-        .then(r => {
-          if (r.data?.thumbnail_url) setPortadasPL(prev => ({ ...prev, [pl.id]: r.data.thumbnail_url }));
-        })
-        .catch(() => {});
-    });
-  }, []);
+    const q = spotifySearchQuery.trim();
+    if (!q) {
+      setSpotifySearchResults(null);
+      return;
+    }
+    if (!spotifyToken) return;
+    let cancelado = false;
+    const t = setTimeout(async () => {
+      setSpotifyBuscando(true);
+      try {
+        const r = await axios.get('https://api.spotify.com/v1/search', {
+          params: { q, type: 'track,playlist', limit: 10 },
+          headers: { Authorization: `Bearer ${spotifyToken}` }
+        });
+        if (!cancelado) {
+          setSpotifySearchResults(r.data);
+          setSpotifyError('');
+        }
+      } catch (e) {
+        if (!cancelado) {
+          const status = e.response?.status;
+          setSpotifyError(`La búsqueda falló (${status || 'sin conexión'})`);
+        }
+      }
+      if (!cancelado) setSpotifyBuscando(false);
+    }, 350);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [spotifySearchQuery, spotifyToken]);
 
   // --- SPOTIFY: Autenticación, SDK y Funciones ---
   useEffect(() => {
@@ -967,7 +992,7 @@ export default function App() {
                     onClick={() => reproducirContextoSpotify(pl.id, 'playlist')}
                   >
                     <div className="spotify-card-cover-wrap">
-                      <img src={portadasPL[pl.id] || pl.img} alt={pl.titulo} className="spotify-card-img" />
+                      <div className="spotify-card-img" style={{ background: pl.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 56, aspectRatio: '1 / 1', borderRadius: 8 }}>{pl.emoji}</div>
                       <button className="spotify-play-hover-btn" title="Reproducir en Spotify">
                         ▶
                       </button>
@@ -987,7 +1012,8 @@ export default function App() {
             <div className="spotify-content-block">
               <div className="spotify-search-bar">
                 <input
-                  placeholder="¿Qué quieres escuchar en Spotify? (Canción, artista o playlist)..."
+                  placeholder="¿Qué quieres escuchar? Empieza a escribir..."
+                  autoFocus
                   value={spotifySearchQuery}
                   onChange={e => setSpotifySearchQuery(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && buscarSpotify()}
@@ -1089,4 +1115,5 @@ export default function App() {
     </div>
   );
 }
+
 
