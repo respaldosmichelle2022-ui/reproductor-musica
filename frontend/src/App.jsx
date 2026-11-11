@@ -13,6 +13,7 @@ export default function App() {
   const [filtro, setFiltro] = useState('');
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
+  const [cargandoMusica, setCargandoMusica] = useState(false);
 
   // Videos Nube
   const [carpetasVideos, setCarpetasVideos] = useState(['Todas']);
@@ -24,7 +25,7 @@ export default function App() {
   const [ytVideos, setYtVideos] = useState([]);
   const [currentVideo, setCurrentVideo] = useState(null);
   const [ytIndex, setYtIndex] = useState(0);
-  const [modoRadioYT, setModoRadioYT] = useState(true); // true = Radio/Sugerencias estilo YouTube, false = lista fija
+  const [modoRadioYT, setModoRadioYT] = useState(true); // true = Radio/Sugerencias estilo YouTube
 
   // Spotify
   const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState('');
@@ -133,12 +134,28 @@ export default function App() {
     }
   };
 
-  // Cargar datos al inicio
-  useEffect(() => {
+  // Funciones de carga robustas con reintento automático
+  const cargarMusica = (reintentos = 3) => {
+    setCargandoMusica(true);
     axios.get(`${API}/api/mp3`)
-      .then(r => setMp3Tracks(r.data.tracks || []))
-      .catch(console.error);
+      .then(r => {
+        const tracks = r.data.tracks || [];
+        setMp3Tracks(tracks);
+        setCargandoMusica(false);
+        if (tracks.length === 0 && reintentos > 0) {
+          setTimeout(() => cargarMusica(reintentos - 1), 1500);
+        }
+      })
+      .catch(err => {
+        console.error('Error cargando MP3s:', err);
+        setCargandoMusica(false);
+        if (reintentos > 0) {
+          setTimeout(() => cargarMusica(reintentos - 1), 2000);
+        }
+      });
+  };
 
+  const cargarVideos = () => {
     axios.get(`${API}/api/videos`)
       .then(r => {
         if (r.data) {
@@ -147,6 +164,12 @@ export default function App() {
         }
       })
       .catch(console.error);
+  };
+
+  // Cargar datos al inicio
+  useEffect(() => {
+    cargarMusica(3);
+    cargarVideos();
   }, []);
 
   // API de YouTube para Radio / Sugerencias continuas
@@ -187,7 +210,6 @@ export default function App() {
         }
       };
 
-      // Si el Modo Radio/Sugerencias está activo, cargamos el YouTube Mix oficial
       if (modoRadioYT) {
         playerConfig.playerVars.listType = 'playlist';
         playerConfig.playerVars.list = 'RD' + currentVideo;
@@ -224,6 +246,9 @@ export default function App() {
     if (!search.trim()) return;
     setBuscando(true);
 
+    // Filtrar también en MP3 locales por si coincide
+    setFiltro(search);
+
     try {
       const yt = await axios.get(`${API}/api/youtube/search`, { params: { q: search } });
       setYtVideos(yt.data.items || []);
@@ -257,13 +282,19 @@ export default function App() {
         <nav className="tab-nav">
           <button
             className={`tab-btn ${tab === 'cloud' ? 'active' : ''}`}
-            onClick={() => setTab('cloud')}
+            onClick={() => {
+              setTab('cloud');
+              if (mp3Tracks.length === 0) cargarMusica(2);
+            }}
           >
             ☁️ Mi Música ({mp3Tracks.length})
           </button>
           <button
             className={`tab-btn ${tab === 'videos_nube' ? 'active' : ''}`}
-            onClick={() => setTab('videos_nube')}
+            onClick={() => {
+              setTab('videos_nube');
+              if (videosNube.length === 0) cargarVideos();
+            }}
           >
             🎬 Mis Videos ({videosNube.length})
           </button>
@@ -339,7 +370,19 @@ export default function App() {
       {(tab === 'cloud' || tab === 'favorites') && (
         <section className="section-content">
           <div className="section-header">
-            <h2>{tab === 'cloud' ? 'Canciones en la nube Backblaze' : 'Mis Canciones Favoritas'}</h2>
+            <div className="section-title-row">
+              <h2>{tab === 'cloud' ? 'Canciones en la nube Backblaze' : 'Mis Canciones Favoritas'}</h2>
+              {tab === 'cloud' && (
+                <button
+                  className="btn-refresh-small"
+                  onClick={() => cargarMusica(2)}
+                  title="Recargar canciones de la nube"
+                  disabled={cargandoMusica}
+                >
+                  {cargandoMusica ? 'Cargando...' : '🔄 Actualizar'}
+                </button>
+              )}
+            </div>
             <input
               className="filtro-input"
               placeholder="Filtrar por nombre o artista..."
@@ -350,9 +393,13 @@ export default function App() {
 
           {audiosVisibles.length === 0 ? (
             <p className="empty-notice">
-              {tab === 'favorites'
+              {cargandoMusica
+                ? 'Conectando con la nube Backblaze...'
+                : tab === 'favorites'
                 ? 'Aún no tienes canciones favoritas. Haz clic en el corazón 🤍 de cualquier canción.'
-                : 'No se encontraron canciones.'}
+                : filtro
+                ? `No se encontraron canciones con "${filtro}".`
+                : 'Cargando lista de canciones de la nube...'}
             </p>
           ) : (
             <ul className="track-list">
@@ -409,7 +456,7 @@ export default function App() {
                 </div>
                 <div className="video-actions">
                   <button className="btn-fullscreen-native" onClick={pantallaCompletaVideo}>
-                    ⛶ Pantalla Completa (Calidad 100% Original)
+                    ⛶ Pantalla Completa (Calidad Original)
                   </button>
                   <a
                     href={currentVideoNube.url}
@@ -481,12 +528,6 @@ export default function App() {
               </div>
             )}
           </div>
-
-          {modoRadioYT && currentVideo && (
-            <div className="yt-info-banner">
-              📻 <strong>Modo Radio Activado:</strong> Al terminar la canción, YouTube reproducirá automáticamente canciones recomendadas y relacionadas con el artista (igual que en YouTube directo).
-            </div>
-          )}
 
           {currentVideo && (
             <div className="yt-embed-container">
