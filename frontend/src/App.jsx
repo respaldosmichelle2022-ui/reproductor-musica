@@ -24,10 +24,9 @@ export default function App() {
   const [ytVideos, setYtVideos] = useState([]);
   const [currentVideo, setCurrentVideo] = useState(null);
   const [ytIndex, setYtIndex] = useState(0);
+  const [modoRadioYT, setModoRadioYT] = useState(true); // true = Radio/Sugerencias estilo YouTube, false = lista fija
 
   // Spotify
-  const [spotifyTracks, setSpotifyTracks] = useState([]);
-  const [spotifyToken, setSpotifyToken] = useState('');
   const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState('');
   const [spotifyInput, setSpotifyInput] = useState('');
 
@@ -99,6 +98,16 @@ export default function App() {
     if (audioRef.current) audioRef.current.pause();
   };
 
+  const pantallaCompletaVideo = () => {
+    if (videoNubeRef.current) {
+      if (videoNubeRef.current.requestFullscreen) {
+        videoNubeRef.current.requestFullscreen();
+      } else if (videoNubeRef.current.webkitRequestFullscreen) {
+        videoNubeRef.current.webkitRequestFullscreen();
+      }
+    }
+  };
+
   const reproducirYouTube = (videoId, index = 0) => {
     setCurrentVideo(videoId);
     setYtIndex(index);
@@ -106,27 +115,30 @@ export default function App() {
     if (audioRef.current) audioRef.current.pause();
   };
 
-  const moverYouTube = direccion => {
-    if (ytVideos.length === 0) return;
-    const nuevoIndex = (ytIndex + direccion + ytVideos.length) % ytVideos.length;
-    reproducirYouTube(ytVideos[nuevoIndex].id.videoId, nuevoIndex);
+  const siguienteYouTube = () => {
+    if (modoRadioYT && ytPlayerRef.current && typeof ytPlayerRef.current.nextVideo === 'function') {
+      ytPlayerRef.current.nextVideo();
+    } else if (ytVideos.length > 0) {
+      const nuevoIndex = (ytIndex + 1) % ytVideos.length;
+      reproducirYouTube(ytVideos[nuevoIndex].id.videoId, nuevoIndex);
+    }
+  };
+
+  const anteriorYouTube = () => {
+    if (modoRadioYT && ytPlayerRef.current && typeof ytPlayerRef.current.previousVideo === 'function') {
+      ytPlayerRef.current.previousVideo();
+    } else if (ytVideos.length > 0) {
+      const nuevoIndex = (ytIndex - 1 + ytVideos.length) % ytVideos.length;
+      reproducirYouTube(ytVideos[nuevoIndex].id.videoId, nuevoIndex);
+    }
   };
 
   // Cargar datos al inicio
   useEffect(() => {
-    const m = window.location.hash.match(/spotify_token=([^&]+)/);
-    if (m) {
-      setSpotifyToken(decodeURIComponent(m[1]));
-      setTab('spotify');
-      window.history.replaceState(null, '', window.location.pathname);
-    }
-
-    // Cargar MP3s
     axios.get(`${API}/api/mp3`)
       .then(r => setMp3Tracks(r.data.tracks || []))
       .catch(console.error);
 
-    // Cargar Videos de la nube
     axios.get(`${API}/api/videos`)
       .then(r => {
         if (r.data) {
@@ -137,7 +149,7 @@ export default function App() {
       .catch(console.error);
   }, []);
 
-  // API de YouTube para auto-reproducción continua del siguiente video
+  // API de YouTube para Radio / Sugerencias continuas
   useEffect(() => {
     if (!window.YT) {
       const tag = document.createElement('script');
@@ -159,7 +171,7 @@ export default function App() {
         ytPlayerRef.current.destroy();
       }
 
-      ytPlayerRef.current = new window.YT.Player('youtube-player-container', {
+      const playerConfig = {
         videoId: currentVideo,
         playerVars: {
           autoplay: 1,
@@ -167,13 +179,21 @@ export default function App() {
         },
         events: {
           onStateChange: event => {
-            // event.data === 0 es YT.PlayerState.ENDED (video terminó)
+            // event.data === 0 (YT.PlayerState.ENDED)
             if (event.data === 0) {
-              moverYouTube(1); // Reproducir el siguiente automáticamente
+              siguienteYouTube();
             }
           }
         }
-      });
+      };
+
+      // Si el Modo Radio/Sugerencias está activo, cargamos el YouTube Mix oficial
+      if (modoRadioYT) {
+        playerConfig.playerVars.listType = 'playlist';
+        playerConfig.playerVars.list = 'RD' + currentVideo;
+      }
+
+      ytPlayerRef.current = new window.YT.Player('youtube-player-container', playerConfig);
     } catch (e) {
       console.warn('Error inicializando YouTube player:', e);
     }
@@ -183,7 +203,7 @@ export default function App() {
     if (currentVideo && window.YT && window.YT.Player) {
       crearOActualizarYTPlayer();
     }
-  }, [currentVideo]);
+  }, [currentVideo, modoRadioYT]);
 
   const cargarEnlaceSpotify = () => {
     if (!spotifyInput.trim()) return;
@@ -210,15 +230,6 @@ export default function App() {
       setTab('youtube');
     } catch (e) {
       console.error(e);
-    }
-
-    if (spotifyToken) {
-      try {
-        const sp = await axios.get(`${API}/api/spotify/search`, { params: { q: search, token: spotifyToken } });
-        setSpotifyTracks(sp.data.tracks?.items || []);
-      } catch (e) {
-        console.error(e);
-      }
     }
     setBuscando(false);
   };
@@ -367,7 +378,7 @@ export default function App() {
         </section>
       )}
 
-      {/* PESTAÑA: VIDEOS NUBE (BACKBLAZE CON CARPETAS) */}
+      {/* PESTAÑA: VIDEOS NUBE */}
       {tab === 'videos_nube' && (
         <section className="section-content">
           <div className="section-header">
@@ -388,17 +399,35 @@ export default function App() {
             ))}
           </div>
 
-          {/* Reproductor de Video Activo */}
+          {/* Reproductor de Video Activo en Calidad Original */}
           {currentVideoNube && (
             <div className="video-player-box">
               <div className="video-header-bar">
-                <strong>🎬 {currentVideoNube.titulo}</strong>
-                <span className="video-folder-badge">📁 {currentVideoNube.carpeta}</span>
+                <div>
+                  <strong>🎬 {currentVideoNube.titulo}</strong>
+                  <span className="video-folder-badge">📁 {currentVideoNube.carpeta}</span>
+                </div>
+                <div className="video-actions">
+                  <button className="btn-fullscreen-native" onClick={pantallaCompletaVideo}>
+                    ⛶ Pantalla Completa (Calidad 100% Original)
+                  </button>
+                  <a
+                    href={currentVideoNube.url}
+                    download={currentVideoNube.archivo}
+                    className="btn-download-link"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    ⬇️ Descargar archivo original
+                  </a>
+                </div>
               </div>
               <video
                 ref={videoNubeRef}
                 controls
                 autoPlay
+                playsInline
+                preload="auto"
                 className="cloud-video-element"
                 src={currentVideoNube.url}
               />
@@ -408,7 +437,6 @@ export default function App() {
           {videosFiltrados.length === 0 ? (
             <div className="empty-notice">
               <p>No hay videos en esta carpeta todavía.</p>
-              <p className="subtext">Sube tus videos en la carpeta correspondiente para verlos aquí.</p>
             </div>
           ) : (
             <div className="video-grid">
@@ -437,14 +465,28 @@ export default function App() {
         <section className="section-content">
           <div className="section-header">
             <h2>Videos de YouTube</h2>
-            {ytVideos.length > 0 && currentVideo && (
+            {currentVideo && (
               <div className="yt-controls-bar">
-                <button className="btn-control" onClick={() => moverYouTube(-1)}>⏮ Video Anterior</button>
-                <button className="btn-control" onClick={() => moverYouTube(1)}>Siguiente Video ⏭</button>
-                <span className="yt-auto-badge">🔁 Reproducción Continua Activada</span>
+                <button className="btn-control" onClick={anteriorYouTube}>⏮ Anterior</button>
+                <button className="btn-control" onClick={siguienteYouTube}>Siguiente Recomendada ⏭</button>
+                
+                {/* Selector de Modo Radio vs Lista Fija */}
+                <button
+                  className={`btn-mode-toggle ${modoRadioYT ? 'active' : ''}`}
+                  onClick={() => setModoRadioYT(!modoRadioYT)}
+                  title="Cambia entre reproducir sugerencias de YouTube o la lista buscada"
+                >
+                  {modoRadioYT ? '📻 Radio Sugerencias: ACTIVADO' : '📋 Lista Búsqueda: FIJA'}
+                </button>
               </div>
             )}
           </div>
+
+          {modoRadioYT && currentVideo && (
+            <div className="yt-info-banner">
+              📻 <strong>Modo Radio Activado:</strong> Al terminar la canción, YouTube reproducirá automáticamente canciones recomendadas y relacionadas con el artista (igual que en YouTube directo).
+            </div>
+          )}
 
           {currentVideo && (
             <div className="yt-embed-container">
