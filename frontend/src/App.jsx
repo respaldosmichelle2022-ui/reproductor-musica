@@ -278,8 +278,21 @@ export default function App() {
     }
   };
 
+  const extraerIdYouTube = texto => {
+    const reg = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = texto.match(reg);
+    return match ? match[1] : null;
+  };
+
   const buscar = async () => {
     if (!search.trim()) return;
+    const directId = extraerIdYouTube(search.trim());
+    if (directId) {
+      setTab('youtube');
+      reproducirYouTube(directId);
+      setSearch('');
+      return;
+    }
     setBuscando(true);
     setFiltro(search);
 
