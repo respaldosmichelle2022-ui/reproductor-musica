@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -287,10 +287,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (currentVideo && window.YT && window.YT.Player) {
+    if (tab === 'youtube' && currentVideo && window.YT && window.YT.Player) {
       crearOActualizarYTPlayer();
     }
-  }, [currentVideo, modoRadioYT]);
+  }, [currentVideo, modoRadioYT, tab]);
 
   // Búsqueda en vivo estilo Spotify: busca mientras escribes (con pequeña pausa)
   useEffect(() => {
@@ -886,51 +886,112 @@ export default function App() {
         </section>
       )}
 
-      {/* PESTAÑA: YOUTUBE */}
-      {tab === 'youtube' && (
-        <section className="section-content">
-          <div className="section-header">
-            <h2>Videos de YouTube</h2>
-            {currentVideo && (
-              <div className="yt-controls-bar">
-                <button className="btn-control" onClick={anteriorYouTube}>⏮ Anterior</button>
-                <button className="btn-control" onClick={siguienteYouTube}>Siguiente Recomendada ⏭</button>
-                <button
-                  className={`btn-mode-toggle ${modoRadioYT ? 'active' : ''}`}
-                  onClick={() => setModoRadioYT(!modoRadioYT)}
-                  title="Cambia entre reproducir sugerencias de YouTube o la lista buscada"
-                >
-                  {modoRadioYT ? '📻 Radio Sugerencias: ACTIVADO' : '📋 Lista Búsqueda: FIJA'}
-                </button>
-              </div>
-            )}
-          </div>
+      {/* PESTAÑA: YOUTUBE (DISEÑO IDÉNTICO A YOUTUBE: PANTALLA IZQUIERDA + LISTA DERECHA) */}
+      {tab === 'youtube' && (() => {
+        const videoActivoObj = ytVideos.find(v => v.id.videoId === currentVideo) || ytVideos[0];
+        return (
+          <section className="section-content yt-watch-section">
+            <div className="yt-watch-layout">
+              {/* Columna Izquierda: Pantalla principal y controles */}
+              <div className="yt-watch-main">
+                {currentVideo ? (
+                  <div className="yt-embed-container">
+                    <div id="youtube-player-container" />
+                  </div>
+                ) : (
+                  <div
+                    className="yt-embed-container yt-placeholder-screen"
+                    onClick={() => ytVideos[0] && reproducirYouTube(ytVideos[0].id.videoId, 0)}
+                  >
+                    {videoActivoObj && (
+                      <img
+                        src={videoActivoObj.snippet.thumbnails.default.url}
+                        alt={videoActivoObj.snippet.title}
+                        className="yt-placeholder-bg"
+                      />
+                    )}
+                    <div className="yt-placeholder-overlay">
+                      <div className="yt-big-play-btn">▶</div>
+                      <span>Haz clic para reproducir o elige un video de la lista derecha</span>
+                    </div>
+                  </div>
+                )}
 
-          {currentVideo && (
-            <div className="yt-embed-container">
-              <div id="youtube-player-container" />
-            </div>
-          )}
+                <div className="yt-watch-info">
+                  <h2 className="yt-watch-title">
+                    {videoActivoObj ? videoActivoObj.snippet.title : 'Videos de YouTube'}
+                  </h2>
 
-          <div className="yt-grid">
-            {ytVideos.map((v, idx) => (
-              <div
-                key={v.id.videoId}
-                className={`yt-card ${v.id.videoId === currentVideo ? 'active' : ''}`}
-                onClick={() => reproducirYouTube(v.id.videoId, idx)}
-              >
-                <img src={v.snippet.thumbnails.default.url} alt={v.snippet.title} />
-                <div className="yt-card-info">
-                  <h4>{v.snippet.title}</h4>
-                  <span className="badge-play">
-                    {v.id.videoId === currentVideo ? '▶ Reproduciendo' : '▶ Reproducir'}
-                  </span>
+                  <div className="yt-watch-meta-bar">
+                    <div className="yt-channel-badge">
+                      <div className="yt-channel-avatar">▶</div>
+                      <div>
+                        <div className="yt-channel-title">
+                          {videoActivoObj?.snippet?.channelTitle || 'YouTube Music'}
+                        </div>
+                        <div className="yt-channel-sub">Canal oficial</div>
+                      </div>
+                    </div>
+
+                    <div className="yt-controls-bar">
+                      <button className="btn-control" onClick={anteriorYouTube} disabled={!currentVideo}>
+                        ⏮ Anterior
+                      </button>
+                      <button className="btn-control" onClick={siguienteYouTube} disabled={!currentVideo}>
+                        Siguiente Recomendada ⏭
+                      </button>
+                      <button
+                        className={`btn-mode-toggle ${modoRadioYT ? 'active' : ''}`}
+                        onClick={() => setModoRadioYT(!modoRadioYT)}
+                        title="Cambia entre reproducir sugerencias de YouTube o la lista buscada"
+                      >
+                        {modoRadioYT ? '📻 Radio Sugerencias: ACTIVADO' : '📋 Lista Búsqueda: FIJA'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+
+              {/* Columna Derecha: Lista de videos sugeridos / Mix */}
+              <aside className="yt-watch-sidebar">
+                <div className="yt-mix-header">
+                  <h3>
+                    {videoActivoObj ? `Mix: ${videoActivoObj.snippet.title}` : 'Videos sugeridos'}
+                  </h3>
+                  <p>Los mixes son playlists que crea YouTube para ti</p>
+                </div>
+
+                <div className="yt-sidebar-list">
+                  {ytVideos.map((v, idx) => {
+                    const esActivo = v.id.videoId === currentVideo;
+                    return (
+                      <div
+                        key={v.id.videoId}
+                        className={`yt-sidebar-card ${esActivo ? 'active' : ''}`}
+                        onClick={() => reproducirYouTube(v.id.videoId, idx)}
+                      >
+                        <span className="yt-sidebar-index">{esActivo ? '▶' : idx + 1}</span>
+                        <div className="yt-sidebar-thumb">
+                          <img src={v.snippet.thumbnails.default.url} alt={v.snippet.title} />
+                          {v.snippet.duration && (
+                            <span className="yt-duration-badge">{v.snippet.duration}</span>
+                          )}
+                        </div>
+                        <div className="yt-sidebar-info">
+                          <h4 title={v.snippet.title}>{v.snippet.title}</h4>
+                          <span className="yt-sidebar-channel">
+                            {v.snippet.channelTitle || 'YouTube'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </aside>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* PESTAÑA: SPOTIFY (DISEÑO OFICIAL IDÉNTICO) */}
       {tab === 'spotify' && (

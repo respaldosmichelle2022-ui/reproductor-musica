@@ -218,10 +218,12 @@ app.get('/api/youtube/search', async (req, res) => {
 
     // Si no hay API key configurada, busca directamente sin requerir credenciales
     const r = await ytSearch(query);
-    const items = (r.videos || []).slice(0, 10).map(v => ({
+    const items = (r.videos || []).slice(0, 15).map(v => ({
       id: { videoId: v.videoId },
       snippet: {
         title: v.title,
+        channelTitle: v.author?.name || 'YouTube',
+        duration: v.timestamp || '',
         thumbnails: {
           default: { url: v.thumbnail || v.image }
         }
