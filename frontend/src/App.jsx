@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -327,7 +327,7 @@ export default function App() {
       setSpotifyUser(r.data);
     }).catch(async err => {
       const status = err.response?.status;
-      const msg = err.response?.data?.error?.message || err.message;
+      const msg = (typeof err.response?.data === 'string' ? err.response.data : (err.response?.data?.error?.message || (err.response?.data ? JSON.stringify(err.response.data) : err.message)));
       if (status === 401) {
         // Token vencido: intentar renovarlo con el refresh_token
         const refresh = localStorage.getItem('spotify_refresh_token');
@@ -448,7 +448,7 @@ export default function App() {
     } catch (e) {
       console.error('Error buscando en Spotify:', e);
       const status = e.response?.status;
-      const msg = e.response?.data?.error?.message || e.message;
+      const msg = (typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.error?.message || (e.response?.data ? JSON.stringify(e.response.data) : e.message)));
       setSpotifyError(`La búsqueda falló (${status || 'sin conexión'}): ${msg}`);
     }
     setSpotifyBuscando(false);
@@ -1083,3 +1083,4 @@ export default function App() {
     </div>
   );
 }
+
