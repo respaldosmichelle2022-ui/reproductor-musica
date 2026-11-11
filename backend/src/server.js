@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import { b2Activo, pistasB2, videosB2 } from './b2.js';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import ytSearch from 'yt-search';
 
@@ -80,32 +81,166 @@ app.get('/api/mp3', async (req, res) => {
   res.json({ tracks: [] });
 });
 
-// Ruta para listar videos organizados por carpeta
-app.get('/api/videos', async (req, res) => {
-  // 1. Prioridad: GitHub Releases (almacenamiento ilimitado y $0)
+// Contraseña maestra y firma criptográfica para pases temporales de Mis Videos
+const VIDEO_MASTER_PASS = process.env.VIDEO_MASTER_PASS || 'Y@mir8122';
+const VIDEO_PASS_SECRET = process.env.VIDEO_PASS_SECRET || 'Yamir_Reproductor_Privado_Secret_2026';
+const EPOCH_OFFSET_MIN = 29000000;
+
+function obtenerDatosVideos() {
   if (fs.existsSync(VIDEOS_JSON)) {
     try {
       const data = JSON.parse(fs.readFileSync(VIDEOS_JSON, 'utf-8'));
-      if (data && data.videos && data.videos.length > 0) {
-        return res.json(data);
-      }
+      if (data && Array.isArray(data.videos)) return data;
     } catch (e) {
       console.error('Error leyendo videos.json:', e.message);
     }
   }
+  return { carpetas: [], videos: [] };
+}
 
-  // 2. Si no hay videos.json, intentar Backblaze
-  if (b2Activo()) {
-    try {
-      const data = await videosB2();
-      return res.json(data);
-    } catch (e) {
-      console.error('Error al listar videos:', e.message);
-      return res.status(502).json({ error: 'No se pudo leer los videos de Backblaze' });
-    }
+function hashCarpeta(nombreCarpeta) {
+  if (!nombreCarpeta || nombreCarpeta === 'TODAS') return '00';
+  return crypto.createHash('md5').update(nombreCarpeta.trim().toUpperCase()).digest('hex').slice(0, 2).toUpperCase();
+}
+
+function generarPaseTemporal(carpeta = 'TODAS', minutos = 60) {
+  const expMin = Math.floor(Date.now() / 60000) + Number(minutos);
+  const timePart = (expMin - EPOCH_OFFSET_MIN).toString(36).toUpperCase();
+  const folderTag = hashCarpeta(carpeta);
+  const sig = crypto
+    .createHmac('sha256', VIDEO_PASS_SECRET)
+    .update(`${timePart}:${folderTag}`)
+    .digest('hex')
+    .slice(0, 4)
+    .toUpperCase();
+  return {
+    codigo: `${timePart}${folderTag}-${sig}`,
+    expiraEnMs: expMin * 60000
+  };
+}
+
+function verificarPaseTemporal(codigoRaw, carpetaSolicitada) {
+  const limpio = String(codigoRaw || '').trim().toUpperCase();
+  const partes = limpio.split('-');
+  if (partes.length !== 2) return null;
+  const [izquierda, sig] = partes;
+  if (izquierda.length < 4 || sig.length !== 4) return null;
+
+  const timePart = izquierda.slice(0, -2);
+  const folderTag = izquierda.slice(-2);
+  const expectedSig = crypto
+    .createHmac('sha256', VIDEO_PASS_SECRET)
+    .update(`${timePart}:${folderTag}`)
+    .digest('hex')
+    .slice(0, 4)
+    .toUpperCase();
+
+  if (sig !== expectedSig) return null;
+
+  const expMin = parseInt(timePart, 36) + EPOCH_OFFSET_MIN;
+  if (Number.isNaN(expMin)) return null;
+
+  const ahoraMin = Math.floor(Date.now() / 60000);
+  if (ahoraMin > expMin) {
+    return { expirado: true };
   }
 
-  res.json({ carpetas: ['Todas'], videos: [] });
+  const tagSolicitado = hashCarpeta(carpetaSolicitada);
+  if (folderTag !== '00' && folderTag !== tagSolicitado) {
+    return { carpetaNoAutorizada: true };
+  }
+
+  return {
+    valido: true,
+    todasLasCarpetas: folderTag === '00',
+    expiraEnMs: expMin * 60000
+  };
+}
+
+// Ruta para listar únicamente las carpetas cerradas (sin exponer los videos hasta poner contraseña)
+app.get('/api/videos', async (req, res) => {
+  const data = obtenerDatosVideos();
+  const conteoPorCarpeta = {};
+  for (const v of data.videos) {
+    const c = v.carpeta || 'General';
+    conteoPorCarpeta[c] = (conteoPorCarpeta[c] || 0) + 1;
+  }
+  const carpetasUnicas = Object.keys(conteoPorCarpeta);
+  const resumenCarpetas = carpetasUnicas.map(nombre => ({
+    nombre,
+    total: conteoPorCarpeta[nombre]
+  }));
+
+  res.json({
+    protegido: true,
+    carpetas: carpetasUnicas,
+    resumenCarpetas,
+    totalVideos: data.videos.length,
+    videos: []
+  });
+});
+
+// Ruta para desbloquear una carpeta con la contraseña maestra o con un pase temporal
+app.post('/api/videos/desbloquear', (req, res) => {
+  const { carpeta, clave } = req.body || {};
+  const claveTrim = String(clave || '').trim();
+  if (!claveTrim) {
+    return res.status(400).json({ error: 'Ingresa la contraseña o pase temporal' });
+  }
+
+  const data = obtenerDatosVideos();
+
+  // 1. Verificar si es la contraseña maestra
+  if (claveTrim === VIDEO_MASTER_PASS) {
+    return res.json({
+      ok: true,
+      esAdmin: true,
+      todasLasCarpetas: true,
+      expiraEnMs: null,
+      videos: data.videos
+    });
+  }
+
+  // 2. Verificar si es un pase temporal firmado
+  const resultadoPase = verificarPaseTemporal(claveTrim, carpeta);
+  if (!resultadoPase) {
+    return res.status(401).json({ error: 'Contraseña o código temporal incorrecto' });
+  }
+  if (resultadoPase.expirado) {
+    return res.status(401).json({ error: 'Este pase temporal ya caducó. Solicita uno nuevo.' });
+  }
+  if (resultadoPase.carpetaNoAutorizada) {
+    return res.status(403).json({ error: 'Este pase temporal es válido únicamente para otra carpeta.' });
+  }
+
+  const videosPermitidos = resultadoPase.todasLasCarpetas
+    ? data.videos
+    : data.videos.filter(v => v.carpeta === carpeta);
+
+  return res.json({
+    ok: true,
+    esAdmin: false,
+    todasLasCarpetas: resultadoPase.todasLasCarpetas,
+    expiraEnMs: resultadoPase.expiraEnMs,
+    videos: videosPermitidos
+  });
+});
+
+// Ruta para que el administrador genere un pase temporal desde su celular o PC
+app.post('/api/videos/crear-pase', (req, res) => {
+  const { claveAdmin, carpeta = 'TODAS', minutos = 60 } = req.body || {};
+  if (String(claveAdmin || '').trim() !== VIDEO_MASTER_PASS) {
+    return res.status(401).json({ error: 'Contraseña de administrador no válida' });
+  }
+  const mins = Math.max(5, Math.min(10080, Number(minutos) || 60));
+  const { codigo, expiraEnMs } = generarPaseTemporal(carpeta, mins);
+  return res.json({
+    ok: true,
+    codigo,
+    expiraEnMs,
+    minutos: mins,
+    carpeta
+  });
 });
 
 // ---------- Spotify ----------

@@ -30,11 +30,26 @@ export default function App() {
   const [isRepeat, setIsRepeat] = useState(false);
   const [cargandoMusica, setCargandoMusica] = useState(false);
 
-  // Videos Nube
-  const [carpetasVideos, setCarpetasVideos] = useState(['Todas']);
+  // Videos Nube (Protegidos por Carpeta con Contraseña Maestra y Pases Temporales)
+  const [carpetasVideos, setCarpetasVideos] = useState([]);
+  const [resumenCarpetasVideos, setResumenCarpetasVideos] = useState([]);
+  const [totalVideosNube, setTotalVideosNube] = useState(0);
   const [videosNube, setVideosNube] = useState([]);
-  const [carpetaSeleccionada, setCarpetaSeleccionada] = useState('Todas');
+  const [carpetaSeleccionada, setCarpetaSeleccionada] = useState('');
   const [currentVideoNube, setCurrentVideoNube] = useState(null);
+  const [carpetasDesbloqueadas, setCarpetasDesbloqueadas] = useState([]);
+  const [esAdminVideos, setEsAdminVideos] = useState(false);
+  const [claveAdminGuardada, setClaveAdminGuardada] = useState('');
+  const [expiracionPaseMs, setExpiracionPaseMs] = useState(null);
+  const [modalClaveCarpeta, setModalClaveCarpeta] = useState('');
+  const [inputClaveVideo, setInputClaveVideo] = useState('');
+  const [errorClaveVideo, setErrorClaveVideo] = useState('');
+  const [verificandoClave, setVerificandoClave] = useState(false);
+  const [modalGenerarPase, setModalGenerarPase] = useState(false);
+  const [paseCarpetaDestino, setPaseCarpetaDestino] = useState('TODAS');
+  const [paseMinutos, setPaseMinutos] = useState(60);
+  const [paseGenerado, setPaseGenerado] = useState(null);
+  const [copiadoPase, setCopiadoPase] = useState(false);
 
   // YouTube
   const [ytVideos, setYtVideos] = useState([]);
@@ -226,11 +241,104 @@ export default function App() {
     axios.get(`${API}/api/videos`)
       .then(r => {
         if (r.data) {
-          setCarpetasVideos(r.data.carpetas || ['Todas']);
-          setVideosNube(r.data.videos || []);
+          setCarpetasVideos(r.data.carpetas || []);
+          setResumenCarpetasVideos(r.data.resumenCarpetas || []);
+          setTotalVideosNube(r.data.totalVideos || 0);
         }
       })
       .catch(console.error);
+  };
+
+  const bloquearCarpetasVideos = () => {
+    setVideosNube([]);
+    setCarpetasDesbloqueadas([]);
+    setCarpetaSeleccionada('');
+    setCurrentVideoNube(null);
+    setEsAdminVideos(false);
+    setClaveAdminGuardada('');
+    setExpiracionPaseMs(null);
+    setModalGenerarPase(false);
+    setPaseGenerado(null);
+  };
+
+  // Vigilar si un pase temporal caduca para bloquear automáticamente
+  useEffect(() => {
+    if (!expiracionPaseMs) return;
+    const msRestantes = expiracionPaseMs - Date.now();
+    if (msRestantes <= 0) {
+      bloquearCarpetasVideos();
+      return;
+    }
+    const timer = setTimeout(() => {
+      bloquearCarpetasVideos();
+      alert('⏳ El tiempo de tu pase temporal ha terminado. La carpeta se ha bloqueado nuevamente.');
+    }, msRestantes);
+    return () => clearTimeout(timer);
+  }, [expiracionPaseMs]);
+
+  const intentarAbrirCarpeta = nombreCarpeta => {
+    if (carpetasDesbloqueadas.includes('*') || carpetasDesbloqueadas.includes(nombreCarpeta)) {
+      setCarpetaSeleccionada(nombreCarpeta);
+      setCurrentVideoNube(null);
+    } else {
+      setModalClaveCarpeta(nombreCarpeta);
+      setInputClaveVideo('');
+      setErrorClaveVideo('');
+    }
+  };
+
+  const confirmarDesbloqueoCarpeta = async () => {
+    if (!inputClaveVideo.trim()) {
+      setErrorClaveVideo('Por favor escribe la contraseña o el código temporal.');
+      return;
+    }
+    setVerificandoClave(true);
+    setErrorClaveVideo('');
+    try {
+      const r = await axios.post(`${API}/api/videos/desbloquear`, {
+        carpeta: modalClaveCarpeta,
+        clave: inputClaveVideo.trim()
+      });
+      if (r.data?.ok) {
+        setVideosNube(r.data.videos || []);
+        if (r.data.todasLasCarpetas) {
+          setCarpetasDesbloqueadas(['*']);
+        } else {
+          setCarpetasDesbloqueadas(prev => [...new Set([...prev, modalClaveCarpeta])]);
+        }
+        if (r.data.esAdmin) {
+          setEsAdminVideos(true);
+          setClaveAdminGuardada(inputClaveVideo.trim());
+          setExpiracionPaseMs(null);
+        } else if (r.data.expiraEnMs) {
+          setExpiracionPaseMs(r.data.expiraEnMs);
+        }
+        setCarpetaSeleccionada(modalClaveCarpeta);
+        setCurrentVideoNube(null);
+        setModalClaveCarpeta('');
+        setInputClaveVideo('');
+      }
+    } catch (e) {
+      const msg = e.response?.data?.error || 'Contraseña o pase temporal incorrecto';
+      setErrorClaveVideo(msg);
+    }
+    setVerificandoClave(false);
+  };
+
+  const generarPaseAdmin = async () => {
+    try {
+      const r = await axios.post(`${API}/api/videos/crear-pase`, {
+        claveAdmin: claveAdminGuardada,
+        carpeta: paseCarpetaDestino,
+        minutos: paseMinutos
+      });
+      if (r.data?.ok) {
+        setPaseGenerado(r.data);
+        setCopiadoPase(false);
+      }
+    } catch (e) {
+      alert(e.response?.data?.error || 'No se pudo generar el pase');
+    }
   };
 
   // Cargar datos al inicio
@@ -615,9 +723,9 @@ export default function App() {
     setBuscando(false);
   };
 
-  const videosFiltrados = carpetaSeleccionada === 'Todas'
-    ? videosNube
-    : videosNube.filter(v => v.carpeta === carpetaSeleccionada);
+  const videosFiltrados = carpetaSeleccionada
+    ? videosNube.filter(v => v.carpeta === carpetaSeleccionada)
+    : [];
 
   // El reproductor flotante de MP3 SOLO debe mostrarse cuando estás escuchando música de la nube o favoritas
   const mostrarReproductorMP3 = Boolean(current) && (tab === 'cloud' || tab === 'favorites');
@@ -649,7 +757,7 @@ export default function App() {
             className={`tab-btn ${tab === 'videos_nube' ? 'active' : ''}`}
             onClick={() => cambiarPestana('videos_nube')}
           >
-            🎬 Mis Videos ({videosNube.length})
+            🎬 Mis Videos ({totalVideosNube || videosNube.length})
           </button>
           <button
             className={`tab-btn ${tab === 'favorites' ? 'active' : ''}`}
@@ -801,119 +909,305 @@ export default function App() {
         </section>
       )}
 
-      {/* PESTAÑA: VIDEOS NUBE */}
+      {/* PESTAÑA: VIDEOS NUBE (CARPETAS PROTEGIDAS CON CONTRASEÑA Y PASE TEMPORAL) */}
       {tab === 'videos_nube' && (
         <section className="section-content">
           <div className="section-header">
-            <h2>🎬 Mis Videos en la Nube</h2>
-          </div>
+            <div>
+              <h2>🎬 Mis Videos en la Nube</h2>
+              <p className="video-privacy-sub">
+                {carpetaSeleccionada
+                  ? `Carpeta abierta: 📁 ${carpetaSeleccionada}`
+                  : 'Selecciona una carpeta e ingresa la contraseña o pase temporal para ver su contenido.'}
+              </p>
+            </div>
 
-          {/* Selector de Carpetas */}
-          <div className="folder-pills">
-            <span className="folder-label">Carpetas:</span>
-            {carpetasVideos.map(c => (
-              <button
-                key={c}
-                className={`pill-btn ${carpetaSeleccionada === c ? 'active' : ''}`}
-                onClick={() => setCarpetaSeleccionada(c)}
-              >
-                📁 {c}
-              </button>
-            ))}
-          </div>
-
-          {/* Reproductor de Video Activo */}
-          {currentVideoNube && (
-            <div className="video-player-box">
-              <div className="video-header-bar">
-                <div>
-                  <strong>🎬 {currentVideoNube.titulo}</strong>
-                  <span className="video-folder-badge">📁 {currentVideoNube.carpeta}</span>
-                </div>
-                <div className="video-actions">
-                  {currentVideoNube.tipo !== 'youtube' ? (
-                    <>
-                      <button className="btn-fullscreen-native" onClick={pantallaCompletaVideo}>
-                        ⛶ Pantalla Completa
-                      </button>
-                      <a
-                        href={currentVideoNube.url}
-                        download={currentVideoNube.archivo}
-                        className="btn-download-link"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        ⬇️ Descargar
-                      </a>
-                    </>
-                  ) : (
-                    <a
-                      href={currentVideoNube.url}
-                      className="btn-download-link"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      ↗ Ver en YouTube
-                    </a>
-                  )}
-                </div>
-              </div>
-              {currentVideoNube.tipo === 'youtube' ? (
-                <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden' }}>
-                  <iframe
-                    src={`https://www.youtube-nocookie.com/embed/${currentVideoNube.youtubeId}?autoplay=1&rel=0`}
-                    title={currentVideoNube.titulo}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
-                  />
-                </div>
-              ) : (
-                <video
-                  ref={videoNubeRef}
-                  controls
-                  autoPlay
-                  playsInline
-                  preload="metadata"
-                  className="cloud-video-element"
-                  src={currentVideoNube.url}
-                />
+            <div className="video-security-actions">
+              {carpetaSeleccionada && (
+                <button
+                  className="btn-control"
+                  onClick={() => {
+                    setCarpetaSeleccionada('');
+                    setCurrentVideoNube(null);
+                  }}
+                >
+                  ⬅ Volver a Carpetas
+                </button>
               )}
+
+              {esAdminVideos && (
+                <button
+                  className="btn-temp-pass"
+                  onClick={() => {
+                    setModalGenerarPase(true);
+                    setPaseGenerado(null);
+                  }}
+                >
+                  🔑 Crear Pase Temporal
+                </button>
+              )}
+
+              {carpetasDesbloqueadas.length > 0 && (
+                <button className="btn-lock-folders" onClick={bloquearCarpetasVideos}>
+                  🔒 Bloquear Carpetas
+                </button>
+              )}
+            </div>
+          </div>
+
+          {expiracionPaseMs && (
+            <div className="temp-pass-active-banner">
+              ⏳ Acceso con pase temporal activo (válido hasta las{' '}
+              {new Date(expiracionPaseMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
             </div>
           )}
 
-          {videosFiltrados.length === 0 ? (
-            <div className="empty-notice">
-              <p>No hay videos en esta carpeta todavía.</p>
-            </div>
+          {/* VISTA 1: LISTA DE CARPETAS CERRADAS / ABIERTAS */}
+          {!carpetaSeleccionada ? (
+            resumenCarpetasVideos.length === 0 ? (
+              <div className="empty-notice">
+                <p>No hay carpetas de videos registradas todavía.</p>
+              </div>
+            ) : (
+              <div className="locked-folders-grid">
+                {resumenCarpetasVideos.map(item => {
+                  const desbloqueada =
+                    carpetasDesbloqueadas.includes('*') || carpetasDesbloqueadas.includes(item.nombre);
+                  return (
+                    <div
+                      key={item.nombre}
+                      className={`locked-folder-card ${desbloqueada ? 'unlocked' : ''}`}
+                      onClick={() => intentarAbrirCarpeta(item.nombre)}
+                    >
+                      <div className="locked-folder-icon-wrap">
+                        <span className="locked-folder-emoji">📁</span>
+                        <span className={`lock-status-pill ${desbloqueada ? 'open' : 'closed'}`}>
+                          {desbloqueada ? '🔓 Desbloqueada' : '🔒 Con contraseña'}
+                        </span>
+                      </div>
+                      <div className="locked-folder-info">
+                        <h3>{item.nombre}</h3>
+                        <span>
+                          {item.total} {item.total === 1 ? 'video privado' : 'videos privados'}
+                        </span>
+                      </div>
+                      <button className="btn-open-folder">
+                        {desbloqueada ? 'Abrir carpeta →' : '🔑 Ingresar contraseña'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )
           ) : (
-            <div className="video-grid">
-              {videosFiltrados.map(v => (
-                <div
-                  key={v.url}
-                  className={`video-card ${currentVideoNube?.url === v.url ? 'active' : ''}`}
-                  onClick={() => reproducirVideoNube(v)}
-                >
-                  <div className="video-card-thumb">
-                    {v.tipo === 'youtube' ? (
-                      <>
-                        <img
-                          src={`https://img.youtube.com/vi/${v.youtubeId}/hqdefault.jpg`}
-                          alt={v.titulo}
-                          className="video-card-thumb-img"
-                        />
-                        <span className="badge-youtube-card">▶ YouTube</span>
-                      </>
-                    ) : (
-                      <span className="video-play-icon">▶</span>
-                    )}
+            /* VISTA 2: ADENTRO DE LA CARPETA DESBLOQUEADA */
+            <>
+              {currentVideoNube && (
+                <div className="video-player-box">
+                  <div className="video-header-bar">
+                    <div>
+                      <strong>🎬 {currentVideoNube.titulo}</strong>
+                      <span className="video-folder-badge">📁 {currentVideoNube.carpeta}</span>
+                    </div>
+                    <div className="video-actions">
+                      {currentVideoNube.tipo !== 'youtube' && (
+                        <>
+                          <button className="btn-fullscreen-native" onClick={pantallaCompletaVideo}>
+                            ⛶ Pantalla Completa
+                          </button>
+                          <a
+                            href={currentVideoNube.url}
+                            download={currentVideoNube.archivo}
+                            className="btn-download-link"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            ⬇️ Descargar
+                          </a>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="video-card-info">
-                    <h4>{v.titulo}</h4>
-                    <span className="video-card-folder">📁 {v.carpeta}</span>
-                  </div>
+                  {currentVideoNube.tipo === 'youtube' ? (
+                    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden' }}>
+                      <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${currentVideoNube.youtubeId}?autoplay=1&rel=0`}
+                        title={currentVideoNube.titulo}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+                      />
+                    </div>
+                  ) : (
+                    <video
+                      ref={videoNubeRef}
+                      controls
+                      autoPlay
+                      playsInline
+                      preload="metadata"
+                      className="cloud-video-element"
+                      src={currentVideoNube.url}
+                    />
+                  )}
                 </div>
-              ))}
+              )}
+
+              {videosFiltrados.length === 0 ? (
+                <div className="empty-notice">
+                  <p>No hay videos en esta carpeta todavía.</p>
+                </div>
+              ) : (
+                <div className="video-grid">
+                  {videosFiltrados.map(v => (
+                    <div
+                      key={v.url}
+                      className={`video-card ${currentVideoNube?.url === v.url ? 'active' : ''}`}
+                      onClick={() => reproducirVideoNube(v)}
+                    >
+                      <div className="video-card-thumb">
+                        {v.tipo === 'youtube' ? (
+                          <>
+                            <img
+                              src={`https://img.youtube.com/vi/${v.youtubeId}/hqdefault.jpg`}
+                              alt={v.titulo}
+                              className="video-card-thumb-img"
+                            />
+                            <span className="badge-youtube-card">▶ Reproducir</span>
+                          </>
+                        ) : (
+                          <span className="video-play-icon">▶</span>
+                        )}
+                      </div>
+                      <div className="video-card-info">
+                        <h4>{v.titulo}</h4>
+                        <span className="video-card-folder">📁 {v.carpeta}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* MODAL PARA INGRESAR CONTRASEÑA O PASE TEMPORAL */}
+          {modalClaveCarpeta && (
+            <div className="security-modal-backdrop" onClick={() => setModalClaveCarpeta('')}>
+              <div className="security-modal-card" onClick={e => e.stopPropagation()}>
+                <div className="security-modal-header">
+                  <h3>🔒 Carpeta Privada: {modalClaveCarpeta}</h3>
+                  <button className="modal-close-x" onClick={() => setModalClaveCarpeta('')}>
+                    ✕
+                  </button>
+                </div>
+                <p className="security-modal-desc">
+                  Ingresa la contraseña o un código de pase temporal autorizado para abrir esta carpeta.
+                </p>
+                <input
+                  type="password"
+                  className="security-pass-input"
+                  placeholder="Contraseña o Pase Temporal..."
+                  value={inputClaveVideo}
+                  onChange={e => setInputClaveVideo(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && confirmarDesbloqueoCarpeta()}
+                  autoFocus
+                />
+                {errorClaveVideo && <div className="security-error-msg">⚠️ {errorClaveVideo}</div>}
+                <div className="security-modal-footer">
+                  <button className="btn-control" onClick={() => setModalClaveCarpeta('')}>
+                    Cancelar
+                  </button>
+                  <button
+                    className="btn-primary"
+                    onClick={confirmarDesbloqueoCarpeta}
+                    disabled={verificandoClave}
+                  >
+                    {verificandoClave ? 'Verificando...' : '🔓 Desbloquear'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL DE ADMINISTRADOR PARA CREAR PASES TEMPORALES */}
+          {modalGenerarPase && esAdminVideos && (
+            <div className="security-modal-backdrop" onClick={() => setModalGenerarPase(false)}>
+              <div className="security-modal-card" onClick={e => e.stopPropagation()}>
+                <div className="security-modal-header">
+                  <h3>🔑 Generador de Pase Temporal</h3>
+                  <button className="modal-close-x" onClick={() => setModalGenerarPase(false)}>
+                    ✕
+                  </button>
+                </div>
+                <p className="security-modal-desc">
+                  Crea un código temporal para compartir con un invitado sin revelar tu contraseña maestra.
+                </p>
+
+                <label className="security-field-label">¿A qué carpeta tendrá acceso?</label>
+                <select
+                  className="security-select"
+                  value={paseCarpetaDestino}
+                  onChange={e => setPaseCarpetaDestino(e.target.value)}
+                >
+                  <option value="TODAS">🔓 Todas las carpetas</option>
+                  {carpetasVideos.map(c => (
+                    <option key={c} value={c}>
+                      📁 Solo: {c}
+                    </option>
+                  ))}
+                </select>
+
+                <label className="security-field-label">¿Cuánto tiempo durará el pase?</label>
+                <select
+                  className="security-select"
+                  value={paseMinutos}
+                  onChange={e => setPaseMinutos(Number(e.target.value))}
+                >
+                  <option value={15}>⏱️ 15 minutos</option>
+                  <option value={30}>⏱️ 30 minutos</option>
+                  <option value={60}>⏱️ 1 hora</option>
+                  <option value={180}>⏱️ 3 horas</option>
+                  <option value={1440}>⏱️ 24 horas (1 día)</option>
+                </select>
+
+                <button className="btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={generarPaseAdmin}>
+                  ✨ Generar Código Temporal
+                </button>
+
+                {paseGenerado && (
+                  <div className="generated-pass-box">
+                    <span className="generated-pass-label">CÓDIGO TEMPORAL LISTO:</span>
+                    <div className="generated-pass-code">{paseGenerado.codigo}</div>
+                    <span className="generated-pass-exp">
+                      Caduca automáticamente a las{' '}
+                      {new Date(paseGenerado.expiraEnMs).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                    <div className="generated-pass-buttons">
+                      <button
+                        className="btn-copy-pass"
+                        onClick={() => {
+                          navigator.clipboard.writeText(paseGenerado.codigo);
+                          setCopiadoPase(true);
+                        }}
+                      >
+                        {copiadoPase ? '✅ ¡Copiado!' : '📋 Copiar código'}
+                      </button>
+                      <a
+                        className="btn-whatsapp-pass"
+                        href={`https://wa.me/?text=${encodeURIComponent(
+                          `Hola, aquí tienes tu código temporal para ver los videos en el reproductor: *${paseGenerado.codigo}* (válido por ${paseGenerado.minutos} min)`
+                        )}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        📲 Enviar por WhatsApp
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </section>
