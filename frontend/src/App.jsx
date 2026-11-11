@@ -25,7 +25,7 @@ export default function App() {
   const [ytVideos, setYtVideos] = useState([]);
   const [currentVideo, setCurrentVideo] = useState(null);
   const [ytIndex, setYtIndex] = useState(0);
-  const [modoRadioYT, setModoRadioYT] = useState(true); // true = Radio/Sugerencias estilo YouTube
+  const [modoRadioYT, setModoRadioYT] = useState(true);
 
   // Spotify
   const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState('');
@@ -99,6 +99,11 @@ export default function App() {
     if (audioRef.current) audioRef.current.pause();
   };
 
+  const cerrarReproductorMP3 = () => {
+    if (audioRef.current) audioRef.current.pause();
+    setCurrent('');
+  };
+
   const pantallaCompletaVideo = () => {
     if (videoNubeRef.current) {
       if (videoNubeRef.current.requestFullscreen) {
@@ -134,7 +139,24 @@ export default function App() {
     }
   };
 
-  // Funciones de carga robustas con reintento automático
+  const cambiarPestana = nuevaPestana => {
+    setTab(nuevaPestana);
+    // Si cambiamos a videos o youtube, pausar mp3 para no encimar sonidos
+    if (nuevaPestana === 'youtube' || nuevaPestana === 'videos_nube') {
+      if (audioRef.current) audioRef.current.pause();
+    }
+    // Si entramos a YouTube y está vacío, cargar sugerencias iniciales
+    if (nuevaPestana === 'youtube' && ytVideos.length === 0) {
+      cargarSugerenciasYouTube();
+    }
+  };
+
+  const cargarSugerenciasYouTube = () => {
+    axios.get(`${API}/api/youtube/search`, { params: { q: 'Grandes Exitos Musica Latina' } })
+      .then(r => setYtVideos(r.data.items || []))
+      .catch(console.error);
+  };
+
   const cargarMusica = (reintentos = 3) => {
     setCargandoMusica(true);
     axios.get(`${API}/api/mp3`)
@@ -170,9 +192,10 @@ export default function App() {
   useEffect(() => {
     cargarMusica(3);
     cargarVideos();
+    cargarSugerenciasYouTube(); // Pre-cargar sugerencias para que YouTube nunca esté vacío
   }, []);
 
-  // API de YouTube para Radio / Sugerencias continuas
+  // API de YouTube
   useEffect(() => {
     if (!window.YT) {
       const tag = document.createElement('script');
@@ -202,7 +225,6 @@ export default function App() {
         },
         events: {
           onStateChange: event => {
-            // event.data === 0 (YT.PlayerState.ENDED)
             if (event.data === 0) {
               siguienteYouTube();
             }
@@ -245,8 +267,6 @@ export default function App() {
   const buscar = async () => {
     if (!search.trim()) return;
     setBuscando(true);
-
-    // Filtrar también en MP3 locales por si coincide
     setFiltro(search);
 
     try {
@@ -262,6 +282,9 @@ export default function App() {
   const videosFiltrados = carpetaSeleccionada === 'Todas'
     ? videosNube
     : videosNube.filter(v => v.carpeta === carpetaSeleccionada);
+
+  // El reproductor flotante de MP3 SOLO debe mostrarse cuando estás escuchando música de la nube o favoritas
+  const mostrarReproductorMP3 = Boolean(current) && (tab === 'cloud' || tab === 'favorites');
 
   return (
     <div className="app-container">
@@ -282,45 +305,39 @@ export default function App() {
         <nav className="tab-nav">
           <button
             className={`tab-btn ${tab === 'cloud' ? 'active' : ''}`}
-            onClick={() => {
-              setTab('cloud');
-              if (mp3Tracks.length === 0) cargarMusica(2);
-            }}
+            onClick={() => cambiarPestana('cloud')}
           >
             ☁️ Mi Música ({mp3Tracks.length})
           </button>
           <button
             className={`tab-btn ${tab === 'videos_nube' ? 'active' : ''}`}
-            onClick={() => {
-              setTab('videos_nube');
-              if (videosNube.length === 0) cargarVideos();
-            }}
+            onClick={() => cambiarPestana('videos_nube')}
           >
             🎬 Mis Videos ({videosNube.length})
           </button>
           <button
             className={`tab-btn ${tab === 'favorites' ? 'active' : ''}`}
-            onClick={() => setTab('favorites')}
+            onClick={() => cambiarPestana('favorites')}
           >
             ❤️ Favoritas ({favoritos.length})
           </button>
           <button
             className={`tab-btn ${tab === 'youtube' ? 'active' : ''}`}
-            onClick={() => setTab('youtube')}
+            onClick={() => cambiarPestana('youtube')}
           >
             ▶ YouTube {ytVideos.length > 0 && `(${ytVideos.length})`}
           </button>
           <button
             className={`tab-btn ${tab === 'spotify' ? 'active' : ''}`}
-            onClick={() => setTab('spotify')}
+            onClick={() => cambiarPestana('spotify')}
           >
             🟢 Spotify
           </button>
         </nav>
       </header>
 
-      {/* REPRODUCTOR DE MP3 FLOTANTE */}
-      {current && (
+      {/* REPRODUCTOR DE MP3 FLOTANTE (Solo se muestra en Mi Música o Favoritas para no estorbar en YouTube o Videos) */}
+      {mostrarReproductorMP3 && (
         <div className="floating-player">
           <div className="player-track-info">
             <span className="player-icon">🎵</span>
@@ -334,6 +351,13 @@ export default function App() {
               title="Guardar en favoritos"
             >
               {favoritos.includes(current) ? '❤️' : '🤍'}
+            </button>
+            <button
+              className="btn-close-player"
+              onClick={cerrarReproductorMP3}
+              title="Cerrar reproductor"
+            >
+              ✕
             </button>
           </div>
 
@@ -446,7 +470,7 @@ export default function App() {
             ))}
           </div>
 
-          {/* Reproductor de Video Activo en Calidad Original */}
+          {/* Reproductor de Video Activo */}
           {currentVideoNube && (
             <div className="video-player-box">
               <div className="video-header-bar">
@@ -456,7 +480,7 @@ export default function App() {
                 </div>
                 <div className="video-actions">
                   <button className="btn-fullscreen-native" onClick={pantallaCompletaVideo}>
-                    ⛶ Pantalla Completa (Calidad Original)
+                    ⛶ Pantalla Completa
                   </button>
                   <a
                     href={currentVideoNube.url}
@@ -465,7 +489,7 @@ export default function App() {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    ⬇️ Descargar archivo original
+                    ⬇️ Descargar
                   </a>
                 </div>
               </div>
@@ -474,7 +498,7 @@ export default function App() {
                 controls
                 autoPlay
                 playsInline
-                preload="auto"
+                preload="metadata"
                 className="cloud-video-element"
                 src={currentVideoNube.url}
               />
@@ -516,8 +540,6 @@ export default function App() {
               <div className="yt-controls-bar">
                 <button className="btn-control" onClick={anteriorYouTube}>⏮ Anterior</button>
                 <button className="btn-control" onClick={siguienteYouTube}>Siguiente Recomendada ⏭</button>
-                
-                {/* Selector de Modo Radio vs Lista Fija */}
                 <button
                   className={`btn-mode-toggle ${modoRadioYT ? 'active' : ''}`}
                   onClick={() => setModoRadioYT(!modoRadioYT)}
@@ -535,27 +557,23 @@ export default function App() {
             </div>
           )}
 
-          {ytVideos.length === 0 ? (
-            <p className="empty-notice">Escribe un artista o canción en el buscador arriba y presiona "Buscar".</p>
-          ) : (
-            <div className="yt-grid">
-              {ytVideos.map((v, idx) => (
-                <div
-                  key={v.id.videoId}
-                  className={`yt-card ${v.id.videoId === currentVideo ? 'active' : ''}`}
-                  onClick={() => reproducirYouTube(v.id.videoId, idx)}
-                >
-                  <img src={v.snippet.thumbnails.default.url} alt={v.snippet.title} />
-                  <div className="yt-card-info">
-                    <h4>{v.snippet.title}</h4>
-                    <span className="badge-play">
-                      {v.id.videoId === currentVideo ? '▶ Reproduciendo' : '▶ Reproducir'}
-                    </span>
-                  </div>
+          <div className="yt-grid">
+            {ytVideos.map((v, idx) => (
+              <div
+                key={v.id.videoId}
+                className={`yt-card ${v.id.videoId === currentVideo ? 'active' : ''}`}
+                onClick={() => reproducirYouTube(v.id.videoId, idx)}
+              >
+                <img src={v.snippet.thumbnails.default.url} alt={v.snippet.title} />
+                <div className="yt-card-info">
+                  <h4>{v.snippet.title}</h4>
+                  <span className="badge-play">
+                    {v.id.videoId === currentVideo ? '▶ Reproduciendo' : '▶ Reproducir'}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
