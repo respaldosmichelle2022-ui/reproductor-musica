@@ -110,34 +110,78 @@ app.get('/api/videos', async (req, res) => {
 
 // ---------- Spotify ----------
 app.get('/api/spotify/login', (req, res) => {
-  const scopes = encodeURIComponent('streaming user-read-email user-read-private');
-  const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${process.env.SPOTIFY_CLIENT_ID}&scope=${scopes}&redirect_uri=${encodeURIComponent(process.env.SPOTIFY_REDIRECT_URI)}`;
+  const scopes = [
+    'streaming',
+    'user-read-email',
+    'user-read-private',
+    'user-read-playback-state',
+    'user-modify-playback-state',
+    'user-read-currently-playing',
+    'playlist-read-private',
+    'playlist-read-collaborative'
+  ].join(' ');
+  const redirectUri = process.env.SPOTIFY_REDIRECT_URI || 'https://reproductor-musica-sigma.vercel.app/callback';
+  const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${process.env.SPOTIFY_CLIENT_ID}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(redirectUri)}&show_dialog=true`;
   res.redirect(authUrl);
 });
 
 app.get('/callback', async (req, res) => {
   const code = req.query.code;
+  if (!code) {
+    return res.redirect('/#spotify_error=access_denied');
+  }
   const tokenUrl = 'https://accounts.spotify.com/api/token';
   const basicAuth = Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64');
-  const response = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${basicAuth}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: process.env.SPOTIFY_REDIRECT_URI
-    })
-  });
-  const data = await response.json();
-  if (!data.access_token) {
-    return res.status(400).json({ error: 'Spotify no devolvio token', detalle: data });
+  const redirectUri = process.env.SPOTIFY_REDIRECT_URI || 'https://reproductor-musica-sigma.vercel.app/callback';
+  
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri
+      })
+    });
+    const data = await response.json();
+    if (!data.access_token) {
+      console.error('Spotify token error:', data);
+      return res.status(400).send(`Error de Spotify: ${data.error_description || JSON.stringify(data)}`);
+    }
+    const destino = process.env.FRONTEND_URL || (fs.existsSync(DIST) ? '/' : 'http://localhost:5173/');
+    res.redirect(`${destino}#spotify_token=${encodeURIComponent(data.access_token)}&refresh_token=${encodeURIComponent(data.refresh_token || '')}`);
+  } catch (err) {
+    console.error('Error en callback:', err);
+    res.status(500).send('Error interno en autenticación Spotify');
   }
-  // Volvemos a la pagina con el token en el hash (no queda en logs del servidor)
-  const destino = process.env.FRONTEND_URL || (fs.existsSync(DIST) ? '/' : 'http://localhost:5173/');
-  res.redirect(`${destino}#spotify_token=${encodeURIComponent(data.access_token)}`);
+});
+
+app.get('/api/spotify/refresh_token', async (req, res) => {
+  const refreshToken = req.query.refresh_token;
+  if (!refreshToken) return res.status(400).json({ error: 'Falta refresh_token' });
+  const tokenUrl = 'https://accounts.spotify.com/api/token';
+  const basicAuth = Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64');
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      })
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/api/spotify/search', async (req, res) => {
@@ -146,12 +190,16 @@ app.get('/api/spotify/search', async (req, res) => {
   if (!token) {
     return res.status(401).json({ error: 'Token de acceso requerido' });
   }
-  const endpoint = `https://api.spotify.com/v1/search?type=track&limit=10&q=${encodeURIComponent(query)}`;
-  const spResponse = await fetch(endpoint, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  const spData = await spResponse.json();
-  res.json(spData);
+  try {
+    const endpoint = `https://api.spotify.com/v1/search?type=track,album,playlist&limit=12&q=${encodeURIComponent(query)}`;
+    const spResponse = await fetch(endpoint, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const spData = await spResponse.json();
+    res.json(spData);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ---------- YouTube ----------
