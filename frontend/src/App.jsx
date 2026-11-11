@@ -55,6 +55,10 @@ export default function App() {
   const [spotifyPlayerDeviceId, setSpotifyPlayerDeviceId] = useState('');
   const spotifyPlayerRef = useRef(null);
   const [spotifyError, setSpotifyError] = useState('');
+  const [spotifySDKActivo, setSpotifySDKActivo] = useState(false);
+  const [spotifyEstado, setSpotifyEstado] = useState(null);
+  const [spotifyPos, setSpotifyPos] = useState(0);
+  const spotifyDeviceRef = useRef('');
   const [portadasPL, setPortadasPL] = useState({});
 
   // Búsqueda general
@@ -121,12 +125,14 @@ export default function App() {
   };
 
   const reproducirMP3 = url => {
+    try { spotifyPlayerRef.current?.pause(); } catch {}
     setCurrent(url);
     setCurrentVideo(null);
     setCurrentVideoNube(null);
   };
 
   const reproducirVideoNube = video => {
+    try { spotifyPlayerRef.current?.pause(); } catch {}
     setCurrentVideoNube(video);
     setCurrentVideo(null);
     if (audioRef.current) audioRef.current.pause();
@@ -148,6 +154,7 @@ export default function App() {
   };
 
   const reproducirYouTube = (videoId, index = 0) => {
+    try { spotifyPlayerRef.current?.pause(); } catch {}
     setCurrentVideo(videoId);
     setYtIndex(index);
     setCurrentVideoNube(null);
@@ -319,6 +326,13 @@ export default function App() {
     };
   }, [spotifySearchQuery, spotifyToken]);
 
+  // Avance de la barra de progreso del reproductor de Spotify
+  useEffect(() => {
+    if (!spotifyEstado || spotifyEstado.paused) return;
+    const t = setInterval(() => setSpotifyPos(p => p + 500), 500);
+    return () => clearInterval(t);
+  }, [spotifyEstado]);
+
   // --- SPOTIFY: Autenticación, SDK y Funciones ---
   useEffect(() => {
     // Revisar si volvemos del login de Spotify en el hash
@@ -396,11 +410,29 @@ export default function App() {
         });
 
         player.addListener('ready', ({ device_id }) => {
+          spotifyDeviceRef.current = device_id;
           setSpotifyPlayerDeviceId(device_id);
         });
 
         player.addListener('not_ready', () => {
+          spotifyDeviceRef.current = '';
           setSpotifyPlayerDeviceId('');
+        });
+
+        player.addListener('player_state_changed', st => {
+          if (!st) return;
+          setSpotifyEstado(st);
+          setSpotifyPos(st.position);
+        });
+
+        player.addListener('authentication_error', () => {
+          setSpotifyError('Spotify: error de autenticación en el reproductor. Cierra sesión e inicia de nuevo.');
+        });
+        player.addListener('account_error', () => {
+          setSpotifyError('Spotify: la reproducción completa requiere una cuenta Premium.');
+        });
+        player.addListener('initialization_error', () => {
+          setSpotifyError('Tu navegador no permite el reproductor de Spotify (se usará el reproductor alterno).');
         });
 
         player.connect();
@@ -435,33 +467,58 @@ export default function App() {
     setSpotifyToken('');
     setSpotifyUser(null);
     setSpotifyUserPlaylists([]);
+    setSpotifySDKActivo(false);
+    setSpotifyEstado(null);
     if (spotifyPlayerRef.current) {
       try { spotifyPlayerRef.current.disconnect(); } catch {}
       spotifyPlayerRef.current = null;
     }
   };
 
-  const reproducirContextoSpotify = (uriOrId, tipo = 'playlist') => {
+  const pausarSpotify = () => {
+    try { spotifyPlayerRef.current?.pause(); } catch {}
+  };
+
+  const reproducirContextoSpotify = async (uriOrId, tipo = 'playlist') => {
     if (audioRef.current) audioRef.current.pause();
     setCurrentVideo(null);
     setCurrentVideoNube(null);
 
-    // Mandar comando a SDK si está conectado
-    if (spotifyToken && spotifyPlayerDeviceId && uriOrId.startsWith('spotify:')) {
-      axios.put(`https://api.spotify.com/v1/me/player/play?device_id=${spotifyPlayerDeviceId}`,
-        uriOrId.includes(':track:') ? { uris: [uriOrId] } : { context_uri: uriOrId },
-        { headers: { Authorization: `Bearer ${spotifyToken}` } }
-      ).catch(e => console.warn('SDK play fallback:', e.message));
+    const uri = uriOrId.startsWith('spotify:') ? uriOrId : `spotify:${tipo}:${uriOrId}`;
+    const [, tipoReal, id] = uri.split(':');
+
+    // Con sesión Premium: reproducir completo dentro de la página con el SDK oficial
+    if (spotifyToken && spotifyPlayerRef.current) {
+      try {
+        // El navegador exige un clic del usuario para permitir audio
+        if (typeof spotifyPlayerRef.current.activateElement === 'function') {
+          await spotifyPlayerRef.current.activateElement();
+        }
+        let device = spotifyDeviceRef.current;
+        for (let i = 0; i < 20 && !device; i++) {
+          await new Promise(res => setTimeout(res, 250));
+          device = spotifyDeviceRef.current;
+        }
+        if (!device) throw new Error('El reproductor de Spotify aún no está listo, intenta de nuevo');
+        await axios.put(
+          `https://api.spotify.com/v1/me/player/play?device_id=${device}`,
+          tipoReal === 'track' ? { uris: [uri] } : { context_uri: uri },
+          { headers: { Authorization: `Bearer ${spotifyToken}` } }
+        );
+        setSpotifySDKActivo(true);
+        setSpotifyError('');
+        return;
+      } catch (e) {
+        const status = e.response?.status;
+        const msg = e.response?.data?.error?.message || e.message;
+        setSpotifyError(`No se pudo iniciar la reproducción completa (${status || ''} ${msg}). Se usó el reproductor alterno.`);
+      }
     }
 
-    // Cargar embed interactivo oficial
-    let id = uriOrId;
-    if (uriOrId.startsWith('spotify:')) {
-      id = uriOrId.split(':').pop();
-    }
-    setSpotifyEmbedUrl(`https://open.spotify.com/embed/${tipo}/${id}?utm_source=generator&theme=0`);
+    // Respaldo: reproductor embebido oficial (sin sesión o si falla el SDK)
+    setSpotifySDKActivo(false);
+    setSpotifyEmbedUrl(`https://open.spotify.com/embed/${tipoReal}/${id}?utm_source=generator&theme=0`);
   };
-
   const buscarSpotify = async () => {
     if (!spotifySearchQuery.trim()) return;
     if (!spotifyToken) {
@@ -964,8 +1021,41 @@ export default function App() {
             </button>
           </div>
 
-          {/* Reproductor Embebido Activo de Spotify */}
-          {spotifyEmbedUrl && (
+          {/* Reproductor propio (SDK oficial, canciones completas con Premium) */}
+          {spotifySDKActivo && spotifyEstado?.track_window?.current_track ? (() => {
+            const pista = spotifyEstado.track_window.current_track;
+            const dur = spotifyEstado.duration || pista.duration_ms || 0;
+            const fmt = ms => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
+            return (
+              <div className="spotify-active-embed-box" style={{ background: 'linear-gradient(135deg,#1f3a2a,#181818)', borderRadius: 12, padding: 20, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+                <img src={pista.album?.images?.[2]?.url || pista.album?.images?.[0]?.url} alt={pista.name} style={{ width: 150, height: 150, borderRadius: 8, objectFit: 'cover' }} />
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <div style={{ fontSize: 12, color: '#1DB954', fontWeight: 700, letterSpacing: 1 }}>REPRODUCIENDO EN SPOTIFY</div>
+                  <h2 style={{ margin: '6px 0 2px', fontSize: 26 }}>{pista.name}</h2>
+                  <div style={{ color: '#b3b3b3', marginBottom: 14 }}>{pista.artists?.map(a => a.name).join(', ')}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 12, color: '#b3b3b3', width: 36 }}>{fmt(spotifyPos)}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={dur}
+                      value={Math.min(spotifyPos, dur)}
+                      onChange={e => { setSpotifyPos(Number(e.target.value)); spotifyPlayerRef.current?.seek(Number(e.target.value)); }}
+                      style={{ flex: 1, accentColor: '#1DB954' }}
+                    />
+                    <span style={{ fontSize: 12, color: '#b3b3b3', width: 36 }}>{fmt(dur)}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 18, alignItems: 'center', marginTop: 12 }}>
+                    <button onClick={() => spotifyPlayerRef.current?.previousTrack()} title="Anterior" style={{ background: 'none', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer' }}>⏮</button>
+                    <button onClick={() => spotifyPlayerRef.current?.togglePlay()} title={spotifyEstado.paused ? 'Reproducir' : 'Pausar'} style={{ width: 56, height: 56, borderRadius: '50%', border: 'none', background: '#fff', color: '#000', fontSize: 24, cursor: 'pointer' }}>
+                      {spotifyEstado.paused ? '▶' : '⏸'}
+                    </button>
+                    <button onClick={() => spotifyPlayerRef.current?.nextTrack()} title="Siguiente" style={{ background: 'none', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer' }}>⏭</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })() : spotifyEmbedUrl && (
             <div className="spotify-active-embed-box">
               <iframe
                 src={spotifyEmbedUrl}
@@ -1115,5 +1205,6 @@ export default function App() {
     </div>
   );
 }
+
 
 
