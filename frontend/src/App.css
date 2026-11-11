@@ -103,7 +103,7 @@ body {
   border-color: var(--primary-color);
 }
 
-/* REPRODUCTOR FLOTANTE */
+/* REPRODUCTOR FLOTANTE DE AUDIO */
 .floating-player {
   background: linear-gradient(135deg, #1f2b23, #191414);
   border: 1px solid #2d4534;
@@ -174,6 +174,7 @@ body {
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 500;
+  transition: all 0.2s;
 }
 
 .btn-control:hover {
@@ -187,7 +188,7 @@ body {
   border-color: var(--primary-color);
 }
 
-/* SECCIONES Y LISTA */
+/* SECCIONES Y LISTAS */
 .section-content {
   background: var(--surface-color);
   padding: 24px;
@@ -274,7 +275,147 @@ body {
   padding: 4px;
 }
 
+/* SELECTOR DE CARPETAS (PILLS) */
+.folder-pills {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.folder-label {
+  color: var(--text-sub);
+  font-size: 0.9rem;
+  margin-right: 4px;
+}
+
+.pill-btn {
+  background: #282828;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 6px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.pill-btn:hover {
+  background: #333;
+}
+
+.pill-btn.active {
+  background: var(--primary-color);
+  color: #000;
+  font-weight: 700;
+  border-color: var(--primary-color);
+}
+
+/* REPRODUCTOR DE VIDEO NUBE */
+.video-player-box {
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.video-header-bar {
+  background: #1a1a1a;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.video-folder-badge {
+  background: #2a2a2a;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  color: var(--text-sub);
+}
+
+.cloud-video-element {
+  width: 100%;
+  max-height: 480px;
+  background: #000;
+  display: block;
+}
+
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.video-card {
+  background: #252525;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.video-card:hover {
+  transform: translateY(-4px);
+  background: #2c2c2c;
+}
+
+.video-card.active {
+  outline: 2px solid var(--primary-color);
+}
+
+.video-card-thumb {
+  height: 120px;
+  background: linear-gradient(135deg, #2b1f3a, #151a28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-play-icon {
+  font-size: 2.2rem;
+  color: #fff;
+  opacity: 0.8;
+}
+
+.video-card-info {
+  padding: 12px;
+}
+
+.video-card-info h4 {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.video-card-folder {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+}
+
 /* YOUTUBE */
+.yt-controls-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.yt-auto-badge {
+  font-size: 0.8rem;
+  color: var(--primary-color);
+  font-weight: 600;
+  background: rgba(29, 185, 84, 0.1);
+  padding: 6px 12px;
+  border-radius: 12px;
+}
+
 .yt-embed-container {
   position: relative;
   width: 100%;
@@ -285,7 +426,8 @@ body {
   background: #000;
 }
 
-.yt-embed-container iframe {
+.yt-embed-container iframe,
+.yt-embed-container div {
   position: absolute;
   top: 0;
   left: 0;
@@ -346,7 +488,7 @@ body {
 
 .badge-play {
   font-size: 0.8rem;
-  color: #ff0000;
+  color: #ff4444;
   font-weight: 600;
 }
 
@@ -397,42 +539,8 @@ body {
   margin-bottom: 24px;
 }
 
-.spotify-auth-section {
-  margin-top: 24px;
-  border-top: 1px solid var(--border-color);
-  padding-top: 16px;
-}
-
-.spotify-auth-section summary {
-  color: var(--text-sub);
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.spotify-login-card {
-  text-align: center;
-  padding: 20px;
-}
-
-.btn-spotify {
-  background-color: #1ed760;
-  color: #000;
-  font-weight: 700;
-  border: none;
-  padding: 12px 28px;
-  border-radius: 24px;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
 .empty-notice {
   color: var(--text-sub);
   text-align: center;
   padding: 30px 0;
-}
-
-.success-badge {
-  color: var(--primary-color);
-  font-weight: 600;
-  margin-bottom: 16px;
 }

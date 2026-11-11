@@ -5,22 +5,37 @@ import './App.css';
 const API = import.meta.env.DEV ? 'http://localhost:8080' : '';
 
 export default function App() {
-  const [tab, setTab] = useState('cloud'); // 'cloud' | 'youtube' | 'spotify' | 'favorites'
+  const [tab, setTab] = useState('cloud'); // 'cloud' | 'videos_nube' | 'youtube' | 'spotify' | 'favorites'
+  
+  // Audios Nube
   const [mp3Tracks, setMp3Tracks] = useState([]);
-  const [spotifyTracks, setSpotifyTracks] = useState([]);
-  const [ytVideos, setYtVideos] = useState([]);
-  const [search, setSearch] = useState('');
-  const [buscando, setBuscando] = useState(false);
-  const [spotifyToken, setSpotifyToken] = useState('');
-  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState('');
-  const [spotifyInput, setSpotifyInput] = useState('');
-  const [currentVideo, setCurrentVideo] = useState(null);
   const [current, setCurrent] = useState('');
   const [filtro, setFiltro] = useState('');
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
 
-  // Favoritos guardados en localStorage
+  // Videos Nube
+  const [carpetasVideos, setCarpetasVideos] = useState(['Todas']);
+  const [videosNube, setVideosNube] = useState([]);
+  const [carpetaSeleccionada, setCarpetaSeleccionada] = useState('Todas');
+  const [currentVideoNube, setCurrentVideoNube] = useState(null);
+
+  // YouTube
+  const [ytVideos, setYtVideos] = useState([]);
+  const [currentVideo, setCurrentVideo] = useState(null);
+  const [ytIndex, setYtIndex] = useState(0);
+
+  // Spotify
+  const [spotifyTracks, setSpotifyTracks] = useState([]);
+  const [spotifyToken, setSpotifyToken] = useState('');
+  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState('');
+  const [spotifyInput, setSpotifyInput] = useState('');
+
+  // Búsqueda general
+  const [search, setSearch] = useState('');
+  const [buscando, setBuscando] = useState(false);
+
+  // Favoritos
   const [favoritos, setFavoritos] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('mp3_favoritos') || '[]');
@@ -30,6 +45,8 @@ export default function App() {
   });
 
   const audioRef = useRef(null);
+  const videoNubeRef = useRef(null);
+  const ytPlayerRef = useRef(null);
 
   const nombre = url => {
     const sinParametros = url.split('?')[0];
@@ -49,10 +66,10 @@ export default function App() {
   };
 
   const listaActual = tab === 'favorites' ? favoritos : mp3Tracks;
-  const visibles = listaActual.filter(u => nombre(u).toLowerCase().includes(filtro.toLowerCase()));
+  const audiosVisibles = listaActual.filter(u => nombre(u).toLowerCase().includes(filtro.toLowerCase()));
 
-  const mover = d => {
-    if (!visibles.length) return;
+  const moverAudio = d => {
+    if (!audiosVisibles.length) return;
     if (isRepeat) {
       if (audioRef.current) {
         audioRef.current.currentTime = 0;
@@ -61,42 +78,41 @@ export default function App() {
       return;
     }
     if (isShuffle) {
-      const azar = Math.floor(Math.random() * visibles.length);
-      reproducirMP3(visibles[azar]);
+      const azar = Math.floor(Math.random() * audiosVisibles.length);
+      reproducirMP3(audiosVisibles[azar]);
       return;
     }
-    const i = visibles.indexOf(current);
-    const siguiente = visibles[(i + d + visibles.length) % visibles.length];
+    const i = audiosVisibles.indexOf(current);
+    const siguiente = audiosVisibles[(i + d + audiosVisibles.length) % audiosVisibles.length];
     reproducirMP3(siguiente);
   };
 
   const reproducirMP3 = url => {
     setCurrent(url);
-    setCurrentVideo(null); // Detener YouTube
+    setCurrentVideo(null);
+    setCurrentVideoNube(null);
   };
 
-  const reproducirYouTube = videoId => {
+  const reproducirVideoNube = video => {
+    setCurrentVideoNube(video);
+    setCurrentVideo(null);
+    if (audioRef.current) audioRef.current.pause();
+  };
+
+  const reproducirYouTube = (videoId, index = 0) => {
     setCurrentVideo(videoId);
-    if (audioRef.current) {
-      audioRef.current.pause(); // Pausar MP3
-    }
+    setYtIndex(index);
+    setCurrentVideoNube(null);
+    if (audioRef.current) audioRef.current.pause();
   };
 
-  const cargarEnlaceSpotify = () => {
-    if (!spotifyInput.trim()) return;
-    // Convierte links de open.spotify.com a embed
-    const match = spotifyInput.match(/spotify\.com\/(track|album|playlist|artist)\/([a-zA-Z0-9]+)/);
-    if (match) {
-      const tipo = match[1];
-      const id = match[2];
-      setSpotifyEmbedUrl(`https://open.spotify.com/embed/${tipo}/${id}?utm_source=generator&theme=0`);
-      if (audioRef.current) audioRef.current.pause();
-      setCurrentVideo(null);
-    } else {
-      alert('Por favor introduce un enlace válido de Spotify (ejemplo: https://open.spotify.com/track/...)');
-    }
+  const moverYouTube = direccion => {
+    if (ytVideos.length === 0) return;
+    const nuevoIndex = (ytIndex + direccion + ytVideos.length) % ytVideos.length;
+    reproducirYouTube(ytVideos[nuevoIndex].id.videoId, nuevoIndex);
   };
 
+  // Cargar datos al inicio
   useEffect(() => {
     const m = window.location.hash.match(/spotify_token=([^&]+)/);
     if (m) {
@@ -104,10 +120,85 @@ export default function App() {
       setTab('spotify');
       window.history.replaceState(null, '', window.location.pathname);
     }
+
+    // Cargar MP3s
     axios.get(`${API}/api/mp3`)
       .then(r => setMp3Tracks(r.data.tracks || []))
       .catch(console.error);
+
+    // Cargar Videos de la nube
+    axios.get(`${API}/api/videos`)
+      .then(r => {
+        if (r.data) {
+          setCarpetasVideos(r.data.carpetas || ['Todas']);
+          setVideosNube(r.data.videos || []);
+        }
+      })
+      .catch(console.error);
   }, []);
+
+  // API de YouTube para auto-reproducción continua del siguiente video
+  useEffect(() => {
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    }
+
+    window.onYouTubeIframeAPIReady = () => {
+      crearOActualizarYTPlayer();
+    };
+  }, []);
+
+  const crearOActualizarYTPlayer = () => {
+    if (!currentVideo || !window.YT || !window.YT.Player) return;
+
+    try {
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.destroy === 'function') {
+        ytPlayerRef.current.destroy();
+      }
+
+      ytPlayerRef.current = new window.YT.Player('youtube-player-container', {
+        videoId: currentVideo,
+        playerVars: {
+          autoplay: 1,
+          rel: 0
+        },
+        events: {
+          onStateChange: event => {
+            // event.data === 0 es YT.PlayerState.ENDED (video terminó)
+            if (event.data === 0) {
+              moverYouTube(1); // Reproducir el siguiente automáticamente
+            }
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('Error inicializando YouTube player:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (currentVideo && window.YT && window.YT.Player) {
+      crearOActualizarYTPlayer();
+    }
+  }, [currentVideo]);
+
+  const cargarEnlaceSpotify = () => {
+    if (!spotifyInput.trim()) return;
+    const match = spotifyInput.match(/spotify\.com\/(track|album|playlist|artist)\/([a-zA-Z0-9]+)/);
+    if (match) {
+      const tipo = match[1];
+      const id = match[2];
+      setSpotifyEmbedUrl(`https://open.spotify.com/embed/${tipo}/${id}?utm_source=generator&theme=0`);
+      if (audioRef.current) audioRef.current.pause();
+      setCurrentVideo(null);
+      setCurrentVideoNube(null);
+    } else {
+      alert('Por favor introduce un enlace válido de Spotify');
+    }
+  };
 
   const buscar = async () => {
     if (!search.trim()) return;
@@ -132,10 +223,14 @@ export default function App() {
     setBuscando(false);
   };
 
+  const videosFiltrados = carpetaSeleccionada === 'Todas'
+    ? videosNube
+    : videosNube.filter(v => v.carpeta === carpetaSeleccionada);
+
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>🎵 Reproductor de Música</h1>
+        <h1>🎵 Reproductor Multimedia</h1>
         <div className="search-bar">
           <input
             placeholder="Buscar artista, canción o video..."
@@ -153,7 +248,13 @@ export default function App() {
             className={`tab-btn ${tab === 'cloud' ? 'active' : ''}`}
             onClick={() => setTab('cloud')}
           >
-            ☁️ Mi Nube ({mp3Tracks.length})
+            ☁️ Mi Música ({mp3Tracks.length})
+          </button>
+          <button
+            className={`tab-btn ${tab === 'videos_nube' ? 'active' : ''}`}
+            onClick={() => setTab('videos_nube')}
+          >
+            🎬 Mis Videos ({videosNube.length})
           </button>
           <button
             className={`tab-btn ${tab === 'favorites' ? 'active' : ''}`}
@@ -182,7 +283,7 @@ export default function App() {
           <div className="player-track-info">
             <span className="player-icon">🎵</span>
             <div className="player-text">
-              <span className="player-status">Reproduciendo ahora:</span>
+              <span className="player-status">Audio en reproducción:</span>
               <strong>{nombre(current)}</strong>
             </div>
             <button
@@ -199,12 +300,12 @@ export default function App() {
             controls
             autoPlay
             src={current}
-            onEnded={() => mover(1)}
+            onEnded={() => moverAudio(1)}
           />
 
           <div className="player-controls">
-            <button className="btn-control" onClick={() => mover(-1)}>⏮ Anterior</button>
-            <button className="btn-control" onClick={() => mover(1)}>Siguiente ⏭</button>
+            <button className="btn-control" onClick={() => moverAudio(-1)}>⏮ Anterior</button>
+            <button className="btn-control" onClick={() => moverAudio(1)}>Siguiente ⏭</button>
             <button
               className={`btn-control ${isShuffle ? 'active-toggle' : ''}`}
               onClick={() => setIsShuffle(!isShuffle)}
@@ -223,7 +324,7 @@ export default function App() {
         </div>
       )}
 
-      {/* PESTAÑA: NUBE O FAVORITAS */}
+      {/* PESTAÑA: AUDIOS NUBE O FAVORITAS */}
       {(tab === 'cloud' || tab === 'favorites') && (
         <section className="section-content">
           <div className="section-header">
@@ -236,15 +337,15 @@ export default function App() {
             />
           </div>
 
-          {visibles.length === 0 ? (
+          {audiosVisibles.length === 0 ? (
             <p className="empty-notice">
               {tab === 'favorites'
-                ? 'Aún no tienes canciones favoritas. Haz clic en el corazón 🤍 de cualquier canción para guardarla aquí.'
-                : 'No se encontraron canciones con ese filtro.'}
+                ? 'Aún no tienes canciones favoritas. Haz clic en el corazón 🤍 de cualquier canción.'
+                : 'No se encontraron canciones.'}
             </p>
           ) : (
             <ul className="track-list">
-              {visibles.map((url, idx) => (
+              {audiosVisibles.map((url, idx) => (
                 <li
                   key={url}
                   className={`track-item ${url === current ? 'active' : ''}`}
@@ -256,7 +357,6 @@ export default function App() {
                   <button
                     className="btn-heart-item"
                     onClick={e => toggleFavorito(url, e)}
-                    title={favoritos.includes(url) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
                   >
                     {favoritos.includes(url) ? '❤️' : '🤍'}
                   </button>
@@ -267,35 +367,107 @@ export default function App() {
         </section>
       )}
 
-      {/* PESTAÑA: YOUTUBE */}
-      {tab === 'youtube' && (
+      {/* PESTAÑA: VIDEOS NUBE (BACKBLAZE CON CARPETAS) */}
+      {tab === 'videos_nube' && (
         <section className="section-content">
-          <h2>Videos de YouTube</h2>
-          {currentVideo && (
-            <div className="yt-embed-container">
-              <iframe
-                src={`https://www.youtube.com/embed/${currentVideo}?autoplay=1`}
-                allow="autoplay; encrypted-media"
-                allowFullScreen
-                title="Reproductor de YouTube"
+          <div className="section-header">
+            <h2>Videos en la Nube Backblaze</h2>
+          </div>
+
+          {/* Selector de Carpetas */}
+          <div className="folder-pills">
+            <span className="folder-label">Carpetas:</span>
+            {carpetasVideos.map(c => (
+              <button
+                key={c}
+                className={`pill-btn ${carpetaSeleccionada === c ? 'active' : ''}`}
+                onClick={() => setCarpetaSeleccionada(c)}
+              >
+                📁 {c}
+              </button>
+            ))}
+          </div>
+
+          {/* Reproductor de Video Activo */}
+          {currentVideoNube && (
+            <div className="video-player-box">
+              <div className="video-header-bar">
+                <strong>🎬 {currentVideoNube.titulo}</strong>
+                <span className="video-folder-badge">📁 {currentVideoNube.carpeta}</span>
+              </div>
+              <video
+                ref={videoNubeRef}
+                controls
+                autoPlay
+                className="cloud-video-element"
+                src={currentVideoNube.url}
               />
             </div>
           )}
 
+          {videosFiltrados.length === 0 ? (
+            <div className="empty-notice">
+              <p>No hay videos en esta carpeta todavía.</p>
+              <p className="subtext">Sube tus videos en la carpeta correspondiente para verlos aquí.</p>
+            </div>
+          ) : (
+            <div className="video-grid">
+              {videosFiltrados.map(v => (
+                <div
+                  key={v.url}
+                  className={`video-card ${currentVideoNube?.url === v.url ? 'active' : ''}`}
+                  onClick={() => reproducirVideoNube(v)}
+                >
+                  <div className="video-card-thumb">
+                    <span className="video-play-icon">▶</span>
+                  </div>
+                  <div className="video-card-info">
+                    <h4>{v.titulo}</h4>
+                    <span className="video-card-folder">📁 {v.carpeta}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* PESTAÑA: YOUTUBE */}
+      {tab === 'youtube' && (
+        <section className="section-content">
+          <div className="section-header">
+            <h2>Videos de YouTube</h2>
+            {ytVideos.length > 0 && currentVideo && (
+              <div className="yt-controls-bar">
+                <button className="btn-control" onClick={() => moverYouTube(-1)}>⏮ Video Anterior</button>
+                <button className="btn-control" onClick={() => moverYouTube(1)}>Siguiente Video ⏭</button>
+                <span className="yt-auto-badge">🔁 Reproducción Continua Activada</span>
+              </div>
+            )}
+          </div>
+
+          {currentVideo && (
+            <div className="yt-embed-container">
+              <div id="youtube-player-container" />
+            </div>
+          )}
+
           {ytVideos.length === 0 ? (
-            <p className="empty-notice">Escribe un artista o canción en la barra de búsqueda arriba y presiona "Buscar".</p>
+            <p className="empty-notice">Escribe un artista o canción en el buscador arriba y presiona "Buscar".</p>
           ) : (
             <div className="yt-grid">
-              {ytVideos.map(v => (
+              {ytVideos.map((v, idx) => (
                 <div
                   key={v.id.videoId}
                   className={`yt-card ${v.id.videoId === currentVideo ? 'active' : ''}`}
-                  onClick={() => reproducirYouTube(v.id.videoId)}
+                  onClick={() => reproducirYouTube(v.id.videoId, idx)}
                 >
                   <img src={v.snippet.thumbnails.default.url} alt={v.snippet.title} />
                   <div className="yt-card-info">
                     <h4>{v.snippet.title}</h4>
-                    <span className="badge-play">▶ Reproducir</span>
+                    <span className="badge-play">
+                      {v.id.videoId === currentVideo ? '▶ Reproduciendo' : '▶ Reproducir'}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -308,12 +480,10 @@ export default function App() {
       {tab === 'spotify' && (
         <section className="section-content">
           <h2>Reproductor de Spotify</h2>
-
-          {/* Opción 1: Pegar link directo sin registro */}
           <div className="spotify-box">
-            <h3>Pegar enlace de canción o playlist de Spotify</h3>
+            <h3>Pegar enlace de Spotify</h3>
             <p className="subtext">
-              Copia cualquier enlace de Spotify (ej: <code>https://open.spotify.com/track/...</code> o playlist) y reprodúcela directamente aquí:
+              Copia cualquier enlace de Spotify (canción, álbum o playlist) y reprodúcelo aquí:
             </p>
             <div className="spotify-input-row">
               <input
@@ -341,36 +511,6 @@ export default function App() {
               />
             </div>
           )}
-
-          {/* Opción 2: Conexión OAuth opcional */}
-          <div className="spotify-auth-section">
-            <details>
-              <summary>¿Tienes claves de desarrollador de Spotify? (Opcional)</summary>
-              <div className="spotify-login-card">
-                {!spotifyToken ? (
-                  <button
-                    className="btn-spotify"
-                    onClick={() => (window.location.href = `${API}/api/spotify/login`)}
-                  >
-                    Conectar con Spotify Developer
-                  </button>
-                ) : (
-                  <div>
-                    <p className="success-badge">✅ Conectado con Spotify API</p>
-                    <ul className="track-list">
-                      {spotifyTracks.map(t => (
-                        <li key={t.id} className="track-item">
-                          <span className="play-symbol">🎵</span>
-                          <span className="track-title">{t.name} — {t.artists.map(a => a.name).join(', ')}</span>
-                          {t.preview_url && <audio controls src={t.preview_url} />}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </details>
-          </div>
         </section>
       )}
     </div>

@@ -4,7 +4,7 @@ import cors from 'cors';
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import { b2Activo, pistasB2 } from './b2.js';
+import { b2Activo, pistasB2, videosB2 } from './b2.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import ytSearch from 'yt-search';
@@ -39,6 +39,20 @@ app.get('/api/mp3', async (req, res) => {
     .sort((a, b) => a.localeCompare(b));
   const base = process.env.MUSIC_BASE_URL || `${req.protocol}://${req.get('host')}/music`;
   res.json({ tracks: files.map(f => `${base}/${encodeURIComponent(f)}`) });
+});
+
+// Ruta para listar videos organizados por carpeta desde Backblaze
+app.get('/api/videos', async (req, res) => {
+  if (b2Activo()) {
+    try {
+      const data = await videosB2();
+      return res.json(data);
+    } catch (e) {
+      console.error('Error al listar videos:', e.message);
+      return res.status(502).json({ error: 'No se pudo leer los videos de Backblaze' });
+    }
+  }
+  res.json({ carpetas: ['Todas'], videos: [] });
 });
 
 // ---------- Spotify ----------
