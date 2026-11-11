@@ -41,6 +41,8 @@ export default function App() {
   const [currentVideo, setCurrentVideo] = useState(null);
   const [ytIndex, setYtIndex] = useState(0);
   const [modoRadioYT, setModoRadioYT] = useState(true);
+  const [ytSearchQuery, setYtSearchQuery] = useState('');
+  const [ytBuscando, setYtBuscando] = useState(false);
 
   // Spotify (Autenticación y Reproducción Oficial)
   const [spotifyToken, setSpotifyToken] = useState(() => localStorage.getItem('spotify_token') || '');
@@ -291,6 +293,37 @@ export default function App() {
       crearOActualizarYTPlayer();
     }
   }, [currentVideo, modoRadioYT, tab]);
+
+  // Búsqueda en vivo en YouTube: actualiza sugerencias mientras escribes
+  useEffect(() => {
+    const q = ytSearchQuery.trim();
+    if (!q) return;
+
+    const directId = extraerIdYouTube(q);
+    if (directId) {
+      reproducirYouTube(directId);
+      return;
+    }
+
+    let cancelado = false;
+    const t = setTimeout(async () => {
+      setYtBuscando(true);
+      try {
+        const r = await axios.get(`${API}/api/youtube/search`, { params: { q } });
+        if (!cancelado && r.data?.items) {
+          setYtVideos(r.data.items);
+        }
+      } catch (e) {
+        console.error('Error en búsqueda dinámica de YouTube:', e);
+      }
+      if (!cancelado) setYtBuscando(false);
+    }, 380);
+
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [ytSearchQuery]);
 
   // Búsqueda en vivo estilo Spotify: busca mientras escribes (con pequeña pausa)
   useEffect(() => {
@@ -891,6 +924,43 @@ export default function App() {
         const videoActivoObj = ytVideos.find(v => v.id.videoId === currentVideo) || ytVideos[0];
         return (
           <section className="section-content yt-watch-section">
+            {/* Barra superior estilo YouTube con buscador en vivo */}
+            <div className="yt-top-bar">
+              <div className="yt-brand-logo">
+                <span className="yt-logo-icon">▶</span>
+                <span className="yt-logo-text">YouTube</span>
+                <span className="yt-logo-country">MX</span>
+              </div>
+
+              <div className="yt-live-search-box">
+                <input
+                  type="text"
+                  placeholder="Buscar en YouTube (escribe y saldrán las sugerencias al instante)..."
+                  value={ytSearchQuery}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setYtSearchQuery(val);
+                    if (!val.trim()) cargarSugerenciasYouTube();
+                  }}
+                />
+                {ytSearchQuery && (
+                  <button
+                    className="yt-search-clear"
+                    onClick={() => {
+                      setYtSearchQuery('');
+                      cargarSugerenciasYouTube();
+                    }}
+                    title="Limpiar búsqueda"
+                  >
+                    ✕
+                  </button>
+                )}
+                <button className="yt-search-btn" title="Buscar">
+                  {ytBuscando ? '⏳' : '🔍'}
+                </button>
+              </div>
+            </div>
+
             <div className="yt-watch-layout">
               {/* Columna Izquierda: Pantalla principal y controles */}
               <div className="yt-watch-main">
@@ -956,9 +1026,19 @@ export default function App() {
               <aside className="yt-watch-sidebar">
                 <div className="yt-mix-header">
                   <h3>
-                    {videoActivoObj ? `Mix: ${videoActivoObj.snippet.title}` : 'Videos sugeridos'}
+                    {ytBuscando
+                      ? `Buscando "${ytSearchQuery}"...`
+                      : ytSearchQuery.trim()
+                        ? `Resultados: ${ytSearchQuery}`
+                        : videoActivoObj
+                          ? `Mix: ${videoActivoObj.snippet.title}`
+                          : 'Videos sugeridos'}
                   </h3>
-                  <p>Los mixes son playlists que crea YouTube para ti</p>
+                  <p>
+                    {ytSearchQuery.trim()
+                      ? `${ytVideos.length} videos encontrados en vivo`
+                      : 'Los mixes son playlists que crea YouTube para ti'}
+                  </p>
                 </div>
 
                 <div className="yt-sidebar-list">
