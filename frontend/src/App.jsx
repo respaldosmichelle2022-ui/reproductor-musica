@@ -41,7 +41,8 @@ import {
   Clock,
   Radio,
   ListMusic,
-  Loader2
+  Loader2,
+  Settings
 } from 'lucide-react';
 import './App.css';
 
@@ -165,7 +166,46 @@ export default function App() {
 
   const audioRef = useRef(null);
   const videoNubeRef = useRef(null);
+  const videoNubeWrapRef = useRef(null);
   const ytPlayerRef = useRef(null);
+  const ytEmbedWrapRef = useRef(null);
+  const cursorTimerRef = useRef(null);
+  const [cursorVideoOculto, setCursorVideoOculto] = useState(false);
+  const [calidadYT, setCalidadYT] = useState('hd1080');
+
+  // Auto-ocultar la flecha del mouse después de 2.5s sin movimiento sobre el video
+  const registrarMovimientoMouseVideo = () => {
+    setCursorVideoOculto(false);
+    if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
+    cursorTimerRef.current = setTimeout(() => {
+      setCursorVideoOculto(true);
+    }, 2500);
+  };
+
+  const salirMouseVideo = () => {
+    if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
+    setCursorVideoOculto(false);
+  };
+
+  const alternarPantallaCompletaElemento = elemento => {
+    if (!elemento) return;
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } else {
+      if (elemento.requestFullscreen) elemento.requestFullscreen();
+      else if (elemento.webkitRequestFullscreen) elemento.webkitRequestFullscreen();
+    }
+  };
+
+  const cambiarCalidadYouTube = nuevaCalidad => {
+    setCalidadYT(nuevaCalidad);
+    if (!ytPlayerRef.current) return;
+    try {
+      ytPlayerRef.current.setPlaybackQualityRange?.(nuevaCalidad, nuevaCalidad);
+      ytPlayerRef.current.setPlaybackQuality?.(nuevaCalidad);
+    } catch {}
+  };
 
   const aplicarVolumenGlobal = (nuevoVol, mute = false) => {
     const vEfectivo = mute ? 0 : nuevoVol;
@@ -279,12 +319,10 @@ export default function App() {
   };
 
   const pantallaCompletaVideo = () => {
-    if (videoNubeRef.current) {
-      if (videoNubeRef.current.requestFullscreen) {
-        videoNubeRef.current.requestFullscreen();
-      } else if (videoNubeRef.current.webkitRequestFullscreen) {
-        videoNubeRef.current.webkitRequestFullscreen();
-      }
+    if (videoNubeWrapRef.current) {
+      alternarPantallaCompletaElemento(videoNubeWrapRef.current);
+    } else if (videoNubeRef.current) {
+      alternarPantallaCompletaElemento(videoNubeRef.current);
     }
   };
 
@@ -346,18 +384,16 @@ export default function App() {
   };
 
   const siguienteYouTube = () => {
-    if (modoRadioYT && ytPlayerRef.current && typeof ytPlayerRef.current.nextVideo === 'function') {
-      ytPlayerRef.current.nextVideo();
-    } else if (ytVideos.length > 0) {
-      const nuevoIndex = (ytIndex + 1) % ytVideos.length;
+    if (ytVideos.length > 0) {
+      const nuevoIndex = modoRadioYT
+        ? (ytIndex + 1) % ytVideos.length
+        : Math.min(ytIndex + 1, ytVideos.length - 1);
       reproducirYouTube(ytVideos[nuevoIndex].id.videoId, nuevoIndex);
     }
   };
 
   const anteriorYouTube = () => {
-    if (modoRadioYT && ytPlayerRef.current && typeof ytPlayerRef.current.previousVideo === 'function') {
-      ytPlayerRef.current.previousVideo();
-    } else if (ytVideos.length > 0) {
+    if (ytVideos.length > 0) {
       const nuevoIndex = (ytIndex - 1 + ytVideos.length) % ytVideos.length;
       reproducirYouTube(ytVideos[nuevoIndex].id.videoId, nuevoIndex);
     }
@@ -542,12 +578,20 @@ export default function App() {
         videoId: currentVideo,
         playerVars: {
           autoplay: 1,
-          rel: 0
+          controls: 1,
+          rel: 0,
+          modestbranding: 1,
+          iv_load_policy: 3,
+          playsinline: 1
         },
         events: {
           onReady: ev => {
             try {
               ev.target.setVolume(silenciado ? 0 : volumen);
+              if (calidadYT && calidadYT !== 'default') {
+                ev.target.setPlaybackQualityRange?.(calidadYT, calidadYT);
+                ev.target.setPlaybackQuality?.(calidadYT);
+              }
             } catch {}
           },
           onStateChange: event => {
@@ -556,6 +600,9 @@ export default function App() {
               try {
                 const d = event.target.getDuration?.();
                 if (d && d > 0) setYtDuracionSeg(Math.floor(d));
+                if (calidadYT && calidadYT !== 'default') {
+                  event.target.setPlaybackQualityRange?.(calidadYT, calidadYT);
+                }
               } catch {}
             } else if (event.data === 2) {
               setYtPausado(true);
@@ -565,11 +612,6 @@ export default function App() {
           }
         }
       };
-
-      if (modoRadioYT) {
-        playerConfig.playerVars.listType = 'playlist';
-        playerConfig.playerVars.list = 'RD' + currentVideo;
-      }
 
       ytPlayerRef.current = new window.YT.Player('youtube-player-container', playerConfig);
     } catch (e) {
@@ -581,7 +623,7 @@ export default function App() {
     if (tab === 'youtube' && currentVideo && window.YT && window.YT.Player) {
       crearOActualizarYTPlayer();
     }
-  }, [currentVideo, modoRadioYT, tab]);
+  }, [currentVideo, tab]);
 
   // Avance de la barra de progreso de YouTube para el reproductor inferior fijo
   useEffect(() => {
@@ -1408,44 +1450,96 @@ export default function App() {
                       </span>
                     </div>
                     <div className="video-actions">
+                      <button className="btn-fullscreen-native" onClick={pantallaCompletaVideo}>
+                        <Maximize2 size={14} strokeWidth={2} /> Pantalla Completa
+                      </button>
                       {currentVideoNube.tipo !== 'youtube' && (
-                        <>
-                          <button className="btn-fullscreen-native" onClick={pantallaCompletaVideo}>
-                            <Maximize2 size={14} strokeWidth={2} /> Pantalla Completa
-                          </button>
-                          <a
-                            href={currentVideoNube.url}
-                            download={currentVideoNube.archivo}
-                            className="btn-download-link"
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            <Download size={14} strokeWidth={2} /> Descargar
-                          </a>
-                        </>
+                        <a
+                          href={currentVideoNube.url}
+                          download={currentVideoNube.archivo}
+                          className="btn-download-link"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Download size={14} strokeWidth={2} /> Descargar
+                        </a>
                       )}
                     </div>
                   </div>
                   {currentVideoNube.tipo === 'youtube' ? (
-                    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden' }}>
+                    <div
+                      ref={videoNubeWrapRef}
+                      className={`yt-embed-container ${cursorVideoOculto ? 'cursor-hidden' : ''}`}
+                      onMouseMove={registrarMovimientoMouseVideo}
+                      onMouseEnter={registrarMovimientoMouseVideo}
+                      onMouseLeave={salirMouseVideo}
+                    >
                       <iframe
-                        src={`https://www.youtube-nocookie.com/embed/${currentVideoNube.youtubeId}?autoplay=1&rel=0`}
+                        src={`https://www.youtube.com/embed/${currentVideoNube.youtubeId}?autoplay=1&controls=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1`}
                         title={currentVideoNube.titulo}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                         allowFullScreen
-                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+                        className="yt-iframe-element"
                       />
+                      {/* Escudo superior: bloquea clic en el título/canal para que no abra YouTube en otra pestaña */}
+                      <div
+                        className="yt-shield-top"
+                        onMouseMove={registrarMovimientoMouseVideo}
+                        title={currentVideoNube.titulo}
+                      />
+                      {/* Escudo inferior izquierdo: bloquea el botón 'Mirar en YouTube' al pausar */}
+                      <div
+                        className="yt-shield-watch-link"
+                        onMouseMove={registrarMovimientoMouseVideo}
+                      />
+                      {/* Escudo inferior derecho: tapa el logo de YouTube (dejando libre el engrane ⚙️ de Calidad) */}
+                      <div
+                        className="yt-shield-logo"
+                        onMouseMove={registrarMovimientoMouseVideo}
+                      >
+                        <button
+                          type="button"
+                          className="yt-shield-fs-btn"
+                          onClick={pantallaCompletaVideo}
+                          title="Pantalla Completa"
+                        >
+                          <Maximize2 size={15} strokeWidth={2.2} />
+                        </button>
+                      </div>
+                      {/* Capa que oculta la flecha del mouse tras 2.5s sin moverlo */}
+                      {cursorVideoOculto && (
+                        <div
+                          className="video-idle-cursor-hider"
+                          onMouseMove={registrarMovimientoMouseVideo}
+                          onMouseDown={registrarMovimientoMouseVideo}
+                        />
+                      )}
                     </div>
                   ) : (
-                    <video
-                      ref={videoNubeRef}
-                      controls
-                      autoPlay
-                      playsInline
-                      preload="metadata"
-                      className="cloud-video-element"
-                      src={currentVideoNube.url}
-                    />
+                    <div
+                      ref={videoNubeWrapRef}
+                      className={`native-video-wrap ${cursorVideoOculto ? 'cursor-hidden' : ''}`}
+                      onMouseMove={registrarMovimientoMouseVideo}
+                      onMouseEnter={registrarMovimientoMouseVideo}
+                      onMouseLeave={salirMouseVideo}
+                    >
+                      <video
+                        ref={videoNubeRef}
+                        controls
+                        autoPlay
+                        playsInline
+                        preload="metadata"
+                        className="cloud-video-element"
+                        src={currentVideoNube.url}
+                      />
+                      {cursorVideoOculto && (
+                        <div
+                          className="video-idle-cursor-hider"
+                          onMouseMove={registrarMovimientoMouseVideo}
+                          onMouseDown={registrarMovimientoMouseVideo}
+                        />
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -1704,18 +1798,67 @@ export default function App() {
               {/* Columna Izquierda: Pantalla principal (con Cortina Anti-Distracción) y controles */}
               <div className="yt-watch-main">
                 {currentVideo ? (
-                  <div className="yt-embed-container">
+                  <div
+                    ref={ytEmbedWrapRef}
+                    className={`yt-embed-container ${
+                      cursorVideoOculto && !ytPantallaBloqueada ? 'cursor-hidden' : ''
+                    }`}
+                    onMouseMove={registrarMovimientoMouseVideo}
+                    onMouseEnter={registrarMovimientoMouseVideo}
+                    onMouseLeave={salirMouseVideo}
+                  >
                     <div id="youtube-player-container" />
 
                     {!ytPantallaBloqueada && (
-                      <button
-                        className="btn-toggle-video-discreet floating"
-                        onClick={alternarVisibilidadVideoYT}
-                        title="Ocultar video y volver al modo solo audio"
-                      >
-                        <EyeOff size={14} strokeWidth={2} />
-                        <span>Mostrar/Ocultar Video</span>
-                      </button>
+                      <>
+                        {/* Escudo superior: bloquea clic en el título/canal para no abrir el video en otra pestaña */}
+                        <div
+                          className="yt-shield-top"
+                          onMouseMove={registrarMovimientoMouseVideo}
+                          onClick={togglePlayYouTube}
+                          title="Clic para pausar o reproducir"
+                        />
+                        {/* Escudo inferior izquierdo: bloquea el enlace 'Mirar en YouTube' cuando está en pausa */}
+                        <div
+                          className="yt-shield-watch-link"
+                          onMouseMove={registrarMovimientoMouseVideo}
+                          onClick={togglePlayYouTube}
+                        />
+                        {/* Escudo inferior derecho: tapa el logo de YouTube dejando libre el engrane ⚙️ de Calidad */}
+                        <div
+                          className="yt-shield-logo"
+                          onMouseMove={registrarMovimientoMouseVideo}
+                        >
+                          <button
+                            type="button"
+                            className="yt-shield-fs-btn"
+                            onClick={() => alternarPantallaCompletaElemento(ytEmbedWrapRef.current)}
+                            title="Pantalla Completa"
+                          >
+                            <Maximize2 size={15} strokeWidth={2.2} />
+                          </button>
+                        </div>
+
+                        <button
+                          className={`btn-toggle-video-discreet floating ${
+                            cursorVideoOculto ? 'fade-out-idle' : ''
+                          }`}
+                          onClick={alternarVisibilidadVideoYT}
+                          title="Ocultar video y volver al modo solo audio"
+                        >
+                          <EyeOff size={14} strokeWidth={2} />
+                          <span>Mostrar/Ocultar Video</span>
+                        </button>
+
+                        {/* Capa que oculta la flecha del mouse tras 2.5s sin moverlo */}
+                        {cursorVideoOculto && (
+                          <div
+                            className="video-idle-cursor-hider"
+                            onMouseMove={registrarMovimientoMouseVideo}
+                            onMouseDown={registrarMovimientoMouseVideo}
+                          />
+                        )}
+                      </>
                     )}
 
                     {/* CUADRO MODO SOLO AUDIO: VIDRIO ESMERILADO + VISUALIZADOR ANIMADO */}
@@ -1871,6 +2014,36 @@ export default function App() {
                       <button className="btn-control" onClick={siguienteYouTube} disabled={!currentVideo}>
                         Siguiente Recomendada <SkipForward size={15} strokeWidth={2.2} />
                       </button>
+
+                      {/* Selector de Calidad de Video + Pantalla Completa */}
+                      {currentVideo && (
+                        <>
+                          <div className="yt-quality-control" title="Seleccionar calidad de reproducción">
+                            <Settings size={14} strokeWidth={2} />
+                            <select
+                              className="yt-quality-select"
+                              value={calidadYT}
+                              onChange={e => cambiarCalidadYouTube(e.target.value)}
+                            >
+                              <option value="hd1080">Calidad: 1080p HD</option>
+                              <option value="hd720">Calidad: 720p HD</option>
+                              <option value="large">Calidad: 480p</option>
+                              <option value="medium">Calidad: 360p</option>
+                              <option value="default">Calidad: Automática</option>
+                            </select>
+                          </div>
+                          {!ytPantallaBloqueada && (
+                            <button
+                              className="btn-control"
+                              onClick={() => alternarPantallaCompletaElemento(ytEmbedWrapRef.current)}
+                              title="Ver video en pantalla completa"
+                            >
+                              <Maximize2 size={15} strokeWidth={2.2} /> Pantalla Completa
+                            </button>
+                          )}
+                        </>
+                      )}
+
                       <button
                         className={`btn-mode-toggle ${modoRadioYT ? 'active' : ''}`}
                         onClick={() => setModoRadioYT(!modoRadioYT)}

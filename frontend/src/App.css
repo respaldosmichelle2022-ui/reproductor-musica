@@ -614,8 +614,17 @@ body {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
 }
 
+.yt-embed-container:fullscreen,
+.yt-embed-container:-webkit-full-screen {
+  padding-bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+}
+
 .yt-embed-container iframe,
-.yt-embed-container > div:not(.yt-placeholder-overlay) {
+.yt-embed-container > #youtube-player-container,
+.yt-iframe-element {
   position: absolute;
   top: 0;
   left: 0;
@@ -1798,6 +1807,123 @@ body {
   right: 12px;
   z-index: 26;
   background: rgba(12, 15, 20, 0.72);
+  transition: opacity 0.25s ease, background 0.18s ease;
+}
+
+.btn-toggle-video-discreet.floating.fade-out-idle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ============================================================
+   ESCUDOS ANTI-REDIRECCIÓN A YOUTUBE + OCULTADOR DE FLECHA DEL MOUSE
+============================================================ */
+/* Bloquea clic en el título superior / avatar / compartir dentro del iframe */
+.yt-shield-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 58px;
+  z-index: 20;
+  background: transparent;
+}
+
+/* Bloquea el botón "Mirar en YouTube" en la esquina inferior izquierda al pausar */
+.yt-shield-watch-link {
+  position: absolute;
+  bottom: 50px;
+  left: 0;
+  width: 185px;
+  height: 48px;
+  z-index: 20;
+  background: transparent;
+}
+
+/* Tapa el logo "▶ YouTube" en la esquina inferior derecha dejando libre el engrane ⚙️ de Calidad */
+.yt-shield-logo {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 112px;
+  height: 46px;
+  z-index: 21;
+  background: #0b0b0b;
+  border-top-left-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 12px;
+  box-sizing: border-box;
+}
+
+.yt-shield-fs-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f1f1f1;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.yt-shield-fs-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
+/* Contenedor de video nativo MP4 y ocultador automático del cursor tras 2.5s */
+.native-video-wrap {
+  position: relative;
+  width: 100%;
+  background: #000;
+}
+
+.yt-embed-container.cursor-hidden,
+.native-video-wrap.cursor-hidden,
+.video-idle-cursor-hider {
+  cursor: none !important;
+}
+
+.video-idle-cursor-hider {
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  background: transparent;
+  cursor: none !important;
+}
+
+/* Selector directo de Calidad en la barra de controles de YouTube */
+.yt-quality-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #222222;
+  border: 1px solid #383838;
+  color: #f1f1f1;
+  padding: 5px 11px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+}
+
+.yt-quality-select {
+  background: transparent;
+  border: none;
+  color: #f1f1f1;
+  font-size: 0.84rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.yt-quality-select option {
+  background: #181818;
+  color: #f1f1f1;
 }
 
 /* ============================================================
