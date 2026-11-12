@@ -229,16 +229,23 @@ export default function App() {
     setErrorClaveYT('');
     try {
       const r = await axios.post(`${API}/api/videos/desbloquear`, {
-        carpeta: 'TODAS',
+        carpeta: 'YOUTUBE',
         clave: inputClaveYT.trim()
       });
       if (r.data?.ok) {
         setYtPantallaBloqueada(false);
+        if (r.data.esAdmin) {
+          setEsAdminVideos(true);
+          setClaveAdminGuardada(inputClaveYT.trim());
+          setExpiracionPaseMs(null);
+        } else if (r.data.expiraEnMs) {
+          setExpiracionPaseMs(r.data.expiraEnMs);
+        }
         setModalDesbloquearYT(false);
         setInputClaveYT('');
       }
     } catch (e) {
-      setErrorClaveYT(e.response?.data?.error || 'Contraseña incorrecta');
+      setErrorClaveYT(e.response?.data?.error || 'Contraseña o pase temporal incorrecto');
     }
     setVerificandoClaveYT(false);
   };
@@ -319,6 +326,7 @@ export default function App() {
     setCarpetasDesbloqueadas([]);
     setCarpetaSeleccionada('');
     setCurrentVideoNube(null);
+    setYtPantallaBloqueada(true);
     setEsAdminVideos(false);
     setClaveAdminGuardada('');
     setExpiracionPaseMs(null);
@@ -1257,90 +1265,91 @@ export default function App() {
               </div>
             </div>
           )}
-
-          {/* MODAL DE ADMINISTRADOR PARA CREAR PASES TEMPORALES */}
-          {modalGenerarPase && esAdminVideos && (
-            <div className="security-modal-backdrop" onClick={() => setModalGenerarPase(false)}>
-              <div className="security-modal-card" onClick={e => e.stopPropagation()}>
-                <div className="security-modal-header">
-                  <h3>🔑 Generador de Pase Temporal</h3>
-                  <button className="modal-close-x" onClick={() => setModalGenerarPase(false)}>
-                    ✕
-                  </button>
-                </div>
-                <p className="security-modal-desc">
-                  Crea un código temporal para compartir con un invitado sin revelar tu contraseña maestra.
-                </p>
-
-                <label className="security-field-label">¿A qué carpeta tendrá acceso?</label>
-                <select
-                  className="security-select"
-                  value={paseCarpetaDestino}
-                  onChange={e => setPaseCarpetaDestino(e.target.value)}
-                >
-                  <option value="TODAS">🔓 Todas las carpetas</option>
-                  {carpetasVideos.map(c => (
-                    <option key={c} value={c}>
-                      📁 Solo: {c}
-                    </option>
-                  ))}
-                </select>
-
-                <label className="security-field-label">¿Cuánto tiempo durará el pase?</label>
-                <select
-                  className="security-select"
-                  value={paseMinutos}
-                  onChange={e => setPaseMinutos(Number(e.target.value))}
-                >
-                  <option value={15}>⏱️ 15 minutos</option>
-                  <option value={30}>⏱️ 30 minutos</option>
-                  <option value={60}>⏱️ 1 hora</option>
-                  <option value={180}>⏱️ 3 horas</option>
-                  <option value={1440}>⏱️ 24 horas (1 día)</option>
-                </select>
-
-                <button className="btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={generarPaseAdmin}>
-                  ✨ Generar Código Temporal
-                </button>
-
-                {paseGenerado && (
-                  <div className="generated-pass-box">
-                    <span className="generated-pass-label">CÓDIGO TEMPORAL LISTO:</span>
-                    <div className="generated-pass-code">{paseGenerado.codigo}</div>
-                    <span className="generated-pass-exp">
-                      Caduca automáticamente a las{' '}
-                      {new Date(paseGenerado.expiraEnMs).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                    <div className="generated-pass-buttons">
-                      <button
-                        className="btn-copy-pass"
-                        onClick={() => {
-                          navigator.clipboard.writeText(paseGenerado.codigo);
-                          setCopiadoPase(true);
-                        }}
-                      >
-                        {copiadoPase ? '✅ ¡Copiado!' : '📋 Copiar código'}
-                      </button>
-                      <a
-                        className="btn-whatsapp-pass"
-                        href={`https://wa.me/?text=${encodeURIComponent(
-                          `Hola, aquí tienes tu código temporal para ver los videos en el reproductor: *${paseGenerado.codigo}* (válido por ${paseGenerado.minutos} min)`
-                        )}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        📲 Enviar por WhatsApp
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </section>
+      )}
+
+      {/* MODAL GLOBAL DE ADMINISTRADOR PARA CREAR PASES TEMPORALES (Funciona en Mis Videos y en YouTube) */}
+      {modalGenerarPase && esAdminVideos && (
+        <div className="security-modal-backdrop" onClick={() => setModalGenerarPase(false)}>
+          <div className="security-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="security-modal-header">
+              <h3>🔑 Generador de Pase Temporal</h3>
+              <button className="modal-close-x" onClick={() => setModalGenerarPase(false)}>
+                ✕
+              </button>
+            </div>
+            <p className="security-modal-desc">
+              Crea un código temporal para compartir con un invitado o colaborador sin revelar tu contraseña maestra.
+            </p>
+
+            <label className="security-field-label">¿A qué tendrá acceso este código?</label>
+            <select
+              className="security-select"
+              value={paseCarpetaDestino}
+              onChange={e => setPaseCarpetaDestino(e.target.value)}
+            >
+              <option value="TODAS">🔓 Todo (Carpetas de Videos + Pantalla de YouTube)</option>
+              <option value="YOUTUBE">▶ Solo Pantalla de YouTube</option>
+              {carpetasVideos.map(c => (
+                <option key={c} value={c}>
+                  📁 Solo carpeta: {c}
+                </option>
+              ))}
+            </select>
+
+            <label className="security-field-label">¿Cuánto tiempo durará el pase?</label>
+            <select
+              className="security-select"
+              value={paseMinutos}
+              onChange={e => setPaseMinutos(Number(e.target.value))}
+            >
+              <option value={15}>⏱️ 15 minutos</option>
+              <option value={30}>⏱️ 30 minutos</option>
+              <option value={60}>⏱️ 1 hora</option>
+              <option value={180}>⏱️ 3 horas</option>
+              <option value={1440}>⏱️ 24 horas (1 día)</option>
+            </select>
+
+            <button className="btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={generarPaseAdmin}>
+              ✨ Generar Código Temporal
+            </button>
+
+            {paseGenerado && (
+              <div className="generated-pass-box">
+                <span className="generated-pass-label">CÓDIGO TEMPORAL LISTO:</span>
+                <div className="generated-pass-code">{paseGenerado.codigo}</div>
+                <span className="generated-pass-exp">
+                  Caduca automáticamente a las{' '}
+                  {new Date(paseGenerado.expiraEnMs).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+                <div className="generated-pass-buttons">
+                  <button
+                    className="btn-copy-pass"
+                    onClick={() => {
+                      navigator.clipboard.writeText(paseGenerado.codigo);
+                      setCopiadoPase(true);
+                    }}
+                  >
+                    {copiadoPase ? '✅ ¡Copiado!' : '📋 Copiar código'}
+                  </button>
+                  <a
+                    className="btn-whatsapp-pass"
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Hola, aquí tienes tu código temporal para desbloquear el reproductor: *${paseGenerado.codigo}* (válido por ${paseGenerado.minutos} min)`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    📲 Enviar por WhatsApp
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* PESTAÑA: YOUTUBE (DISEÑO IDÉNTICO A YOUTUBE + CORTINA ANTI-DISTRACCIÓN PROTEGIBLE CON CONTRASEÑA) */}
@@ -1384,8 +1393,21 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Botón de Modo Operativo: Desbloquear o volver a Tapar Pantalla */}
-              <div>
+              {/* Botones de Modo Operativo: Desbloquear, Crear Pase Temporal y volver a Tapar Pantalla */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {esAdminVideos && (
+                  <button
+                    className="btn-temp-pass"
+                    onClick={() => {
+                      setPaseCarpetaDestino('YOUTUBE');
+                      setModalGenerarPase(true);
+                      setPaseGenerado(null);
+                    }}
+                    title="Generar código temporal para que alguien pueda ver videos de YouTube o abrir carpetas"
+                  >
+                    🔑 Crear Pase Temporal
+                  </button>
+                )}
                 {ytPantallaBloqueada ? (
                   <button
                     className="btn-temp-pass"
@@ -1396,7 +1418,7 @@ export default function App() {
                     }}
                     title="Desbloquear imagen del video con contraseña"
                   >
-                    🔑 Desbloquear Video
+                    🔓 Desbloquear Video
                   </button>
                 ) : (
                   <button
