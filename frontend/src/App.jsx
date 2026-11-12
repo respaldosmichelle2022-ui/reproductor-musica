@@ -168,18 +168,40 @@ export default function App() {
   const videoNubeRef = useRef(null);
   const videoNubeWrapRef = useRef(null);
   const ytPlayerRef = useRef(null);
+  const nubeYtPlayerRef = useRef(null);
   const ytEmbedWrapRef = useRef(null);
   const cursorTimerRef = useRef(null);
+  const ultimaPosMouseRef = useRef({ x: -1, y: -1 });
   const [cursorVideoOculto, setCursorVideoOculto] = useState(false);
   const [calidadYT, setCalidadYT] = useState('hd1080');
+  const [nubeYtPausado, setNubeYtPausado] = useState(false);
+  const [nubeYtTiempoSeg, setNubeYtTiempoSeg] = useState(0);
+  const [nubeYtDuracionSeg, setNubeYtDuracionSeg] = useState(0);
 
-  // Auto-ocultar la flecha del mouse después de 2.2s sin movimiento sobre el video
-  const registrarMovimientoMouseVideo = () => {
+  const formatearSegundosVideo = seg => {
+    const s = Math.max(0, Math.floor(Number(seg) || 0));
+    const hrs = Math.floor(s / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secs = String(s % 60).padStart(2, '0');
+    return hrs > 0 ? `${hrs}:${String(mins).padStart(2, '0')}:${secs}` : `${mins}:${secs}`;
+  };
+
+  // Auto-ocultar la flecha del mouse y la barra de controles después de 2s sin movimiento físico
+  const registrarMovimientoMouseVideo = (e, forzar = false) => {
+    if (!forzar && e && typeof e.clientX === 'number' && typeof e.clientY === 'number') {
+      const dx = Math.abs(e.clientX - ultimaPosMouseRef.current.x);
+      const dy = Math.abs(e.clientY - ultimaPosMouseRef.current.y);
+      // Ignorar eventos mousemove sintéticos del navegador cuando el ratón está quieto
+      if (dx < 3 && dy < 3) {
+        return;
+      }
+      ultimaPosMouseRef.current = { x: e.clientX, y: e.clientY };
+    }
     setCursorVideoOculto(false);
     if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
     cursorTimerRef.current = setTimeout(() => {
       setCursorVideoOculto(true);
-    }, 2200);
+    }, 2000);
   };
 
   const salirMouseVideo = () => {
@@ -187,7 +209,7 @@ export default function App() {
     setCursorVideoOculto(false);
   };
 
-  // Mantener vigilancia global del puntero y asegurar que Pantalla Completa siempre incluya los escudos
+  // Mantener vigilancia global del puntero en YouTube y Mis Videos (normal y Pantalla Completa)
   useEffect(() => {
     const videoVisibleActivo =
       (tab === 'youtube' && Boolean(currentVideo) && !ytPantallaBloqueada) ||
@@ -200,37 +222,31 @@ export default function App() {
       return;
     }
 
-    registrarMovimientoMouseVideo();
+    registrarMovimientoMouseVideo(null, true);
 
-    const alMoverMouse = () => {
-      registrarMovimientoMouseVideo();
+    const alMoverMouse = ev => {
+      registrarMovimientoMouseVideo(ev, false);
+    };
+
+    const alActividadDirecta = () => {
+      registrarMovimientoMouseVideo(null, true);
     };
 
     const alCambiarFullscreen = () => {
-      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-      // Si por doble clic el navegador puso el iframe crudo en pantalla completa, pasar al contenedor con escudos
-      if (fsEl && fsEl.tagName === 'IFRAME' && fsEl.parentElement) {
-        const contenedor = fsEl.parentElement;
-        if (document.exitFullscreen) {
-          document.exitFullscreen().then(() => {
-            contenedor.requestFullscreen?.().catch(() => {});
-          }).catch(() => {});
-        }
-      }
-      registrarMovimientoMouseVideo();
+      registrarMovimientoMouseVideo(null, true);
     };
 
     window.addEventListener('mousemove', alMoverMouse, { passive: true });
-    window.addEventListener('mousedown', alMoverMouse, { passive: true });
-    window.addEventListener('keydown', alMoverMouse, { passive: true });
+    window.addEventListener('mousedown', alActividadDirecta, { passive: true });
+    window.addEventListener('keydown', alActividadDirecta, { passive: true });
     document.addEventListener('fullscreenchange', alCambiarFullscreen);
     document.addEventListener('webkitfullscreenchange', alCambiarFullscreen);
 
     return () => {
       if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
       window.removeEventListener('mousemove', alMoverMouse);
-      window.removeEventListener('mousedown', alMoverMouse);
-      window.removeEventListener('keydown', alMoverMouse);
+      window.removeEventListener('mousedown', alActividadDirecta);
+      window.removeEventListener('keydown', alActividadDirecta);
       document.removeEventListener('fullscreenchange', alCambiarFullscreen);
       document.removeEventListener('webkitfullscreenchange', alCambiarFullscreen);
       document.body.classList.remove('video-cursor-none');
@@ -254,11 +270,37 @@ export default function App() {
 
   const cambiarCalidadYouTube = nuevaCalidad => {
     setCalidadYT(nuevaCalidad);
-    if (!ytPlayerRef.current) return;
-    try {
-      ytPlayerRef.current.setPlaybackQualityRange?.(nuevaCalidad, nuevaCalidad);
-      ytPlayerRef.current.setPlaybackQuality?.(nuevaCalidad);
-    } catch {}
+    const aplicarCalidad = (player, vidId, estaPausado) => {
+      if (!player) return;
+      try {
+        player.setPlaybackQualityRange?.(nuevaCalidad, nuevaCalidad);
+        player.setPlaybackQuality?.(nuevaCalidad);
+        if (vidId && typeof player.getCurrentTime === 'function') {
+          const segActual = player.getCurrentTime() || 0;
+          if (estaPausado && typeof player.cueVideoById === 'function') {
+            player.cueVideoById({
+              videoId: vidId,
+              startSeconds: segActual,
+              suggestedQuality: nuevaCalidad
+            });
+          } else if (typeof player.loadVideoById === 'function') {
+            player.loadVideoById({
+              videoId: vidId,
+              startSeconds: segActual,
+              suggestedQuality: nuevaCalidad
+            });
+          }
+          setTimeout(() => {
+            try {
+              player.setPlaybackQualityRange?.(nuevaCalidad, nuevaCalidad);
+              player.setPlaybackQuality?.(nuevaCalidad);
+            } catch {}
+          }, 350);
+        }
+      } catch {}
+    };
+    aplicarCalidad(ytPlayerRef.current, currentVideo, ytPausado);
+    aplicarCalidad(nubeYtPlayerRef.current, currentVideoNube?.youtubeId, nubeYtPausado);
   };
 
   const aplicarVolumenGlobal = (nuevoVol, mute = false) => {
@@ -276,6 +318,9 @@ export default function App() {
     } catch {}
     try {
       ytPlayerRef.current?.setVolume?.(vEfectivo);
+    } catch {}
+    try {
+      nubeYtPlayerRef.current?.setVolume?.(vEfectivo);
     } catch {}
   };
 
@@ -347,6 +392,7 @@ export default function App() {
     try { spotifyPlayerRef.current?.pause(); } catch {}
     try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
     try { ytPlayerRef.current?.pauseVideo?.(); } catch {}
+    try { nubeYtPlayerRef.current?.pauseVideo?.(); } catch {}
     setSpotifyPausadoMulti(true);
     setSpotifyTrackActual(null);
     setCurrent(url);
@@ -362,6 +408,9 @@ export default function App() {
     setSpotifyPausadoMulti(true);
     setSpotifyTrackActual(null);
     setCurrent('');
+    setNubeYtPausado(false);
+    setNubeYtTiempoSeg(0);
+    setNubeYtDuracionSeg(0);
     setCurrentVideoNube(video);
     setCurrentVideo(null);
     if (audioRef.current) audioRef.current.pause();
@@ -383,6 +432,7 @@ export default function App() {
   const reproducirYouTube = (videoId, index = 0) => {
     try { spotifyPlayerRef.current?.pause(); } catch {}
     try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
+    try { nubeYtPlayerRef.current?.pauseVideo?.(); } catch {}
     setSpotifyPausadoMulti(true);
     setSpotifyTrackActual(null);
     setCurrent('');
@@ -403,6 +453,19 @@ export default function App() {
       } else {
         ytPlayerRef.current.pauseVideo?.();
         setYtPausado(true);
+      }
+    } catch {}
+  };
+
+  const togglePlayNubeYT = () => {
+    if (!nubeYtPlayerRef.current) return;
+    try {
+      if (nubeYtPausado) {
+        nubeYtPlayerRef.current.playVideo?.();
+        setNubeYtPausado(false);
+      } else {
+        nubeYtPlayerRef.current.pauseVideo?.();
+        setNubeYtPausado(true);
       }
     } catch {}
   };
@@ -617,22 +680,53 @@ export default function App() {
 
     window.onYouTubeIframeAPIReady = () => {
       crearOActualizarYTPlayer();
+      crearOActualizarNubeYTPlayer();
     };
   }, []);
 
-  const crearOActualizarYTPlayer = () => {
-    if (!currentVideo || !window.YT || !window.YT.Player) return;
+  const crearOActualizarYTPlayer = async () => {
+    if (!currentVideo) return;
+    for (let i = 0; i < 25 && (!window.YT || !window.YT.Player); i++) {
+      await new Promise(res => setTimeout(res, 200));
+    }
+    if (!window.YT || !window.YT.Player) return;
 
     try {
+      const iframeExistente = ytPlayerRef.current?.getIframe?.();
+      if (
+        ytPlayerRef.current &&
+        typeof ytPlayerRef.current.loadVideoById === 'function' &&
+        iframeExistente &&
+        document.body.contains(iframeExistente)
+      ) {
+        ytPlayerRef.current.loadVideoById({
+          videoId: currentVideo,
+          suggestedQuality: calidadYT || 'hd1080'
+        });
+        try {
+          ytPlayerRef.current.setVolume(silenciado ? 0 : volumen);
+          if (calidadYT && calidadYT !== 'default') {
+            ytPlayerRef.current.setPlaybackQualityRange?.(calidadYT, calidadYT);
+            ytPlayerRef.current.setPlaybackQuality?.(calidadYT);
+          }
+        } catch {}
+        return;
+      }
+
       if (ytPlayerRef.current && typeof ytPlayerRef.current.destroy === 'function') {
         ytPlayerRef.current.destroy();
+        ytPlayerRef.current = null;
       }
+
+      const contenedor = document.getElementById('youtube-player-container');
+      if (!contenedor) return;
 
       const playerConfig = {
         videoId: currentVideo,
         playerVars: {
           autoplay: 1,
-          controls: 1,
+          controls: 0,
+          disablekb: 1,
           fs: 0,
           rel: 0,
           modestbranding: 1,
@@ -643,10 +737,13 @@ export default function App() {
           onReady: ev => {
             try {
               ev.target.setVolume(silenciado ? 0 : volumen);
+              const d = ev.target.getDuration?.();
+              if (d && d > 0) setYtDuracionSeg(Math.floor(d));
               if (calidadYT && calidadYT !== 'default') {
                 ev.target.setPlaybackQualityRange?.(calidadYT, calidadYT);
                 ev.target.setPlaybackQuality?.(calidadYT);
               }
+              ev.target.playVideo?.();
             } catch {}
           },
           onStateChange: event => {
@@ -657,6 +754,7 @@ export default function App() {
                 if (d && d > 0) setYtDuracionSeg(Math.floor(d));
                 if (calidadYT && calidadYT !== 'default') {
                   event.target.setPlaybackQualityRange?.(calidadYT, calidadYT);
+                  event.target.setPlaybackQuality?.(calidadYT);
                 }
               } catch {}
             } else if (event.data === 2) {
@@ -674,13 +772,111 @@ export default function App() {
     }
   };
 
+  const crearOActualizarNubeYTPlayer = async () => {
+    const vidId = currentVideoNube?.tipo === 'youtube' ? currentVideoNube?.youtubeId : null;
+    if (!vidId) return;
+    for (let i = 0; i < 25 && (!window.YT || !window.YT.Player); i++) {
+      await new Promise(res => setTimeout(res, 200));
+    }
+    if (!window.YT || !window.YT.Player) return;
+
+    try {
+      const iframeExistente = nubeYtPlayerRef.current?.getIframe?.();
+      if (
+        nubeYtPlayerRef.current &&
+        typeof nubeYtPlayerRef.current.loadVideoById === 'function' &&
+        iframeExistente &&
+        document.body.contains(iframeExistente)
+      ) {
+        nubeYtPlayerRef.current.loadVideoById({
+          videoId: vidId,
+          suggestedQuality: calidadYT || 'hd1080'
+        });
+        try {
+          nubeYtPlayerRef.current.setVolume(silenciado ? 0 : volumen);
+          if (calidadYT && calidadYT !== 'default') {
+            nubeYtPlayerRef.current.setPlaybackQualityRange?.(calidadYT, calidadYT);
+            nubeYtPlayerRef.current.setPlaybackQuality?.(calidadYT);
+          }
+        } catch {}
+        return;
+      }
+
+      if (nubeYtPlayerRef.current && typeof nubeYtPlayerRef.current.destroy === 'function') {
+        nubeYtPlayerRef.current.destroy();
+        nubeYtPlayerRef.current = null;
+      }
+
+      const contenedor = document.getElementById('cloud-youtube-player-container');
+      if (!contenedor) return;
+
+      nubeYtPlayerRef.current = new window.YT.Player('cloud-youtube-player-container', {
+        videoId: vidId,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          rel: 0,
+          modestbranding: 1,
+          iv_load_policy: 3,
+          playsinline: 1
+        },
+        events: {
+          onReady: ev => {
+            try {
+              ev.target.setVolume(silenciado ? 0 : volumen);
+              const d = ev.target.getDuration?.();
+              if (d && d > 0) setNubeYtDuracionSeg(Math.floor(d));
+              if (calidadYT && calidadYT !== 'default') {
+                ev.target.setPlaybackQualityRange?.(calidadYT, calidadYT);
+                ev.target.setPlaybackQuality?.(calidadYT);
+              }
+              ev.target.playVideo?.();
+            } catch {}
+          },
+          onStateChange: event => {
+            if (event.data === 1) {
+              setNubeYtPausado(false);
+              try {
+                const d = event.target.getDuration?.();
+                if (d && d > 0) setNubeYtDuracionSeg(Math.floor(d));
+                if (calidadYT && calidadYT !== 'default') {
+                  event.target.setPlaybackQualityRange?.(calidadYT, calidadYT);
+                  event.target.setPlaybackQuality?.(calidadYT);
+                }
+              } catch {}
+            } else if (event.data === 2) {
+              setNubeYtPausado(true);
+            } else if (event.data === 0) {
+              setNubeYtPausado(true);
+            }
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('Error inicializando reproductor de Mis Videos:', e);
+    }
+  };
+
   useEffect(() => {
-    if (tab === 'youtube' && currentVideo && window.YT && window.YT.Player) {
+    if (tab === 'youtube' && currentVideo) {
       crearOActualizarYTPlayer();
     }
   }, [currentVideo, tab]);
 
-  // Avance de la barra de progreso de YouTube para el reproductor inferior fijo
+  useEffect(() => {
+    if (tab === 'videos_nube' && currentVideoNube?.tipo === 'youtube' && currentVideoNube?.youtubeId) {
+      crearOActualizarNubeYTPlayer();
+    } else if (!currentVideoNube && nubeYtPlayerRef.current) {
+      try {
+        nubeYtPlayerRef.current.destroy?.();
+        nubeYtPlayerRef.current = null;
+      } catch {}
+    }
+  }, [currentVideoNube, tab]);
+
+  // Avance de la barra de progreso de YouTube y Mis Videos
   useEffect(() => {
     if (!currentVideo || ytPausado) return;
     const t = setInterval(() => {
@@ -693,6 +889,19 @@ export default function App() {
     }, 500);
     return () => clearInterval(t);
   }, [currentVideo, ytPausado]);
+
+  useEffect(() => {
+    if (!currentVideoNube || currentVideoNube.tipo !== 'youtube' || nubeYtPausado) return;
+    const t = setInterval(() => {
+      try {
+        const cur = nubeYtPlayerRef.current?.getCurrentTime?.();
+        const dur = nubeYtPlayerRef.current?.getDuration?.();
+        if (typeof cur === 'number' && !Number.isNaN(cur)) setNubeYtTiempoSeg(Math.floor(cur));
+        if (typeof dur === 'number' && !Number.isNaN(dur) && dur > 0) setNubeYtDuracionSeg(Math.floor(dur));
+      } catch {}
+    }, 500);
+    return () => clearInterval(t);
+  }, [currentVideoNube, nubeYtPausado]);
 
   // Búsqueda en vivo en YouTube: actualiza sugerencias mientras escribes
   useEffect(() => {
@@ -1526,55 +1735,115 @@ export default function App() {
                       ref={videoNubeWrapRef}
                       className={`yt-embed-container ${cursorVideoOculto ? 'cursor-hidden' : ''}`}
                       onMouseMove={registrarMovimientoMouseVideo}
-                      onMouseEnter={registrarMovimientoMouseVideo}
+                      onMouseEnter={e => registrarMovimientoMouseVideo(e, true)}
                       onMouseLeave={salirMouseVideo}
                     >
-                      <iframe
-                        src={`https://www.youtube.com/embed/${currentVideoNube.youtubeId}?autoplay=1&controls=1&fs=0&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1`}
-                        title={currentVideoNube.titulo}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        className="yt-iframe-element"
-                      />
-                      {/* Escudo superior amplio: bloquea título, canal y compartir incluso en Pantalla Completa */}
-                      <div
-                        className="yt-shield-top"
-                        onMouseMove={registrarMovimientoMouseVideo}
-                        onDoubleClick={pantallaCompletaVideo}
-                        title={currentVideoNube.titulo}
-                      />
-                      {/* Escudo central-izquierdo: bloquea 'Mirar en YouTube' y tarjetas sugeridas */}
-                      <div
-                        className="yt-shield-watch-link"
-                        onMouseMove={registrarMovimientoMouseVideo}
-                        onDoubleClick={pantallaCompletaVideo}
-                      />
-                      {/* Escudo inferior derecho: tapa el logo de YouTube (dejando libre el engrane ⚙️ de Calidad) */}
-                      <div
-                        className="yt-shield-logo"
-                        onMouseMove={registrarMovimientoMouseVideo}
-                      >
-                        <button
-                          type="button"
-                          className="yt-shield-fs-btn"
-                          onClick={pantallaCompletaVideo}
-                          title="Pantalla Completa"
-                        >
-                          <Maximize2 size={15} strokeWidth={2.2} />
-                        </button>
+                      <div className="yt-iframe-crop-stage">
+                        <div id="cloud-youtube-player-container" />
                       </div>
-                      {/* Capa que oculta la flecha del mouse tras 2.2s sin moverlo */}
+
+                      {/* Superficie de interacción propia: clic para Play/Pausa, doble clic para Pantalla Completa, oculta la flecha tras 2s */}
                       <div
-                        className={`video-idle-cursor-hider ${cursorVideoOculto ? 'active' : ''}`}
+                        className="video-click-surface"
                         onMouseMove={registrarMovimientoMouseVideo}
-                        onMouseDown={registrarMovimientoMouseVideo}
+                        onClick={e => {
+                          registrarMovimientoMouseVideo(e, true);
+                          togglePlayNubeYT();
+                        }}
+                        onDoubleClick={pantallaCompletaVideo}
+                        title="Clic para pausar/reproducir • Doble clic para Pantalla Completa"
                       />
+
+                      {/* Barra de controles integrada en el video (se oculta sola junto con la flecha tras 2s sin mover el mouse) */}
+                      <div
+                        className={`custom-video-controls-bar ${cursorVideoOculto ? 'hidden-idle' : ''}`}
+                        onMouseMove={registrarMovimientoMouseVideo}
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <input
+                          type="range"
+                          className="custom-video-seek"
+                          min={0}
+                          max={nubeYtDuracionSeg > 0 ? nubeYtDuracionSeg : 100}
+                          value={nubeYtDuracionSeg > 0 ? Math.min(nubeYtTiempoSeg, nubeYtDuracionSeg) : 0}
+                          onChange={e => {
+                            const seg = Number(e.target.value);
+                            setNubeYtTiempoSeg(seg);
+                            try {
+                              nubeYtPlayerRef.current?.seekTo?.(seg, true);
+                            } catch {}
+                          }}
+                        />
+                        <div className="custom-video-controls-row">
+                          <div className="custom-video-left">
+                            <button
+                              type="button"
+                              className="custom-video-btn"
+                              onClick={togglePlayNubeYT}
+                              title={nubeYtPausado ? 'Reproducir' : 'Pausar'}
+                            >
+                              {nubeYtPausado ? (
+                                <Play size={16} strokeWidth={2.4} fill="currentColor" />
+                              ) : (
+                                <Pause size={16} strokeWidth={2.4} fill="currentColor" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              className="custom-video-btn"
+                              onClick={() => aplicarVolumenGlobal(volumen, !silenciado)}
+                              title={silenciado ? 'Activar sonido' : 'Silenciar'}
+                            >
+                              {silenciado || volumen === 0 ? (
+                                <VolumeX size={16} strokeWidth={2.2} />
+                              ) : (
+                                <Volume2 size={16} strokeWidth={2.2} />
+                              )}
+                            </button>
+                            <input
+                              type="range"
+                              className="custom-video-vol"
+                              min={0}
+                              max={100}
+                              value={silenciado ? 0 : volumen}
+                              onChange={e => aplicarVolumenGlobal(Number(e.target.value), false)}
+                            />
+                            <span className="custom-video-time">
+                              {formatearSegundosVideo(nubeYtTiempoSeg)} / {formatearSegundosVideo(nubeYtDuracionSeg)}
+                            </span>
+                          </div>
+                          <div className="custom-video-right">
+                            <div className="custom-video-quality" title="Calidad de video">
+                              <Settings size={13} strokeWidth={2.2} />
+                              <select
+                                value={calidadYT}
+                                onChange={e => cambiarCalidadYouTube(e.target.value)}
+                              >
+                                <option value="hd1080">1080p HD</option>
+                                <option value="hd720">720p HD</option>
+                                <option value="large">480p</option>
+                                <option value="medium">360p</option>
+                                <option value="default">Auto</option>
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              className="custom-video-btn"
+                              onClick={pantallaCompletaVideo}
+                              title="Pantalla Completa"
+                            >
+                              <Maximize2 size={16} strokeWidth={2.2} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div
                       ref={videoNubeWrapRef}
                       className={`native-video-wrap ${cursorVideoOculto ? 'cursor-hidden' : ''}`}
                       onMouseMove={registrarMovimientoMouseVideo}
-                      onMouseEnter={registrarMovimientoMouseVideo}
+                      onMouseEnter={e => registrarMovimientoMouseVideo(e, true)}
                       onMouseLeave={salirMouseVideo}
                     >
                       <video
@@ -1585,11 +1854,6 @@ export default function App() {
                         preload="metadata"
                         className="cloud-video-element"
                         src={currentVideoNube.url}
-                      />
-                      <div
-                        className={`video-idle-cursor-hider ${cursorVideoOculto ? 'active' : ''}`}
-                        onMouseMove={registrarMovimientoMouseVideo}
-                        onMouseDown={registrarMovimientoMouseVideo}
                       />
                     </div>
                   )}
@@ -1856,42 +2120,26 @@ export default function App() {
                       cursorVideoOculto && !ytPantallaBloqueada ? 'cursor-hidden' : ''
                     }`}
                     onMouseMove={registrarMovimientoMouseVideo}
-                    onMouseEnter={registrarMovimientoMouseVideo}
+                    onMouseEnter={e => registrarMovimientoMouseVideo(e, true)}
                     onMouseLeave={salirMouseVideo}
                   >
-                    <div id="youtube-player-container" />
+                    <div className="yt-iframe-crop-stage">
+                      <div id="youtube-player-container" />
+                    </div>
 
                     {!ytPantallaBloqueada && (
                       <>
-                        {/* Escudo superior amplio: bloquea clic en título y canal incluso en Pantalla Completa */}
+                        {/* Superficie de interacción propia: clic para Play/Pausa, doble clic para Pantalla Completa, oculta la flecha tras 2s */}
                         <div
-                          className="yt-shield-top"
+                          className="video-click-surface"
                           onMouseMove={registrarMovimientoMouseVideo}
-                          onClick={togglePlayYouTube}
+                          onClick={e => {
+                            registrarMovimientoMouseVideo(e, true);
+                            togglePlayYouTube();
+                          }}
                           onDoubleClick={() => alternarPantallaCompletaElemento(ytEmbedWrapRef.current)}
                           title="Clic para pausar/reproducir • Doble clic para Pantalla Completa"
                         />
-                        {/* Escudo central-izquierdo: bloquea 'Mirar en YouTube' y tarjetas sugeridas al pausar */}
-                        <div
-                          className="yt-shield-watch-link"
-                          onMouseMove={registrarMovimientoMouseVideo}
-                          onClick={togglePlayYouTube}
-                          onDoubleClick={() => alternarPantallaCompletaElemento(ytEmbedWrapRef.current)}
-                        />
-                        {/* Escudo inferior derecho: tapa el logo de YouTube dejando libre el engrane ⚙️ de Calidad */}
-                        <div
-                          className="yt-shield-logo"
-                          onMouseMove={registrarMovimientoMouseVideo}
-                        >
-                          <button
-                            type="button"
-                            className="yt-shield-fs-btn"
-                            onClick={() => alternarPantallaCompletaElemento(ytEmbedWrapRef.current)}
-                            title="Pantalla Completa"
-                          >
-                            <Maximize2 size={15} strokeWidth={2.2} />
-                          </button>
-                        </div>
 
                         <button
                           className={`btn-toggle-video-discreet floating ${
@@ -1904,12 +2152,105 @@ export default function App() {
                           <span>Mostrar/Ocultar Video</span>
                         </button>
 
-                        {/* Capa permanente que oculta la flecha del mouse tras 2.2s sin moverlo */}
+                        {/* Barra de controles integrada en el video (se oculta sola junto con la flecha tras 2s sin mover el mouse) */}
                         <div
-                          className={`video-idle-cursor-hider ${cursorVideoOculto ? 'active' : ''}`}
+                          className={`custom-video-controls-bar ${cursorVideoOculto ? 'hidden-idle' : ''}`}
                           onMouseMove={registrarMovimientoMouseVideo}
-                          onMouseDown={registrarMovimientoMouseVideo}
-                        />
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <input
+                            type="range"
+                            className="custom-video-seek"
+                            min={0}
+                            max={ytDuracionSeg > 0 ? ytDuracionSeg : 100}
+                            value={ytDuracionSeg > 0 ? Math.min(ytTiempoSeg, ytDuracionSeg) : 0}
+                            onChange={e => {
+                              const seg = Number(e.target.value);
+                              setYtTiempoSeg(seg);
+                              try {
+                                ytPlayerRef.current?.seekTo?.(seg, true);
+                              } catch {}
+                            }}
+                          />
+                          <div className="custom-video-controls-row">
+                            <div className="custom-video-left">
+                              <button
+                                type="button"
+                                className="custom-video-btn"
+                                onClick={anteriorYouTube}
+                                title="Anterior"
+                              >
+                                <SkipBack size={16} strokeWidth={2.3} />
+                              </button>
+                              <button
+                                type="button"
+                                className="custom-video-btn"
+                                onClick={togglePlayYouTube}
+                                title={ytPausado ? 'Reproducir' : 'Pausar'}
+                              >
+                                {ytPausado ? (
+                                  <Play size={16} strokeWidth={2.4} fill="currentColor" />
+                                ) : (
+                                  <Pause size={16} strokeWidth={2.4} fill="currentColor" />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className="custom-video-btn"
+                                onClick={siguienteYouTube}
+                                title="Siguiente"
+                              >
+                                <SkipForward size={16} strokeWidth={2.3} />
+                              </button>
+                              <button
+                                type="button"
+                                className="custom-video-btn"
+                                onClick={() => aplicarVolumenGlobal(volumen, !silenciado)}
+                                title={silenciado ? 'Activar sonido' : 'Silenciar'}
+                              >
+                                {silenciado || volumen === 0 ? (
+                                  <VolumeX size={16} strokeWidth={2.2} />
+                                ) : (
+                                  <Volume2 size={16} strokeWidth={2.2} />
+                                )}
+                              </button>
+                              <input
+                                type="range"
+                                className="custom-video-vol"
+                                min={0}
+                                max={100}
+                                value={silenciado ? 0 : volumen}
+                                onChange={e => aplicarVolumenGlobal(Number(e.target.value), false)}
+                              />
+                              <span className="custom-video-time">
+                                {formatearSegundosVideo(ytTiempoSeg)} / {formatearSegundosVideo(ytDuracionSeg)}
+                              </span>
+                            </div>
+                            <div className="custom-video-right">
+                              <div className="custom-video-quality" title="Calidad de video">
+                                <Settings size={13} strokeWidth={2.2} />
+                                <select
+                                  value={calidadYT}
+                                  onChange={e => cambiarCalidadYouTube(e.target.value)}
+                                >
+                                  <option value="hd1080">1080p HD</option>
+                                  <option value="hd720">720p HD</option>
+                                  <option value="large">480p</option>
+                                  <option value="medium">360p</option>
+                                  <option value="default">Auto</option>
+                                </select>
+                              </div>
+                              <button
+                                type="button"
+                                className="custom-video-btn"
+                                onClick={() => alternarPantallaCompletaElemento(ytEmbedWrapRef.current)}
+                                title="Pantalla Completa"
+                              >
+                                <Maximize2 size={16} strokeWidth={2.2} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </>
                     )}
 
@@ -2545,7 +2886,9 @@ export default function App() {
           tituloBarra = currentVideoNube.titulo;
           subtituloBarra = `Mis Videos • ${currentVideoNube.carpeta}`;
           iconoBarra = <Film size={22} strokeWidth={2} />;
-          enPausa = false;
+          enPausa = currentVideoNube.tipo === 'youtube' ? nubeYtPausado : false;
+          posSeg = currentVideoNube.tipo === 'youtube' ? nubeYtTiempoSeg : 0;
+          durSeg = currentVideoNube.tipo === 'youtube' ? nubeYtDuracionSeg : 0;
         }
 
         const manejarPlayPausaGlobal = () => {
@@ -2562,6 +2905,8 @@ export default function App() {
             }
           } else if (fuente === 'youtube') {
             togglePlayYouTube();
+          } else if (fuente === 'video_nube' && currentVideoNube?.tipo === 'youtube') {
+            togglePlayNubeYT();
           } else if (audiosVisibles.length > 0) {
             reproducirMP3(audiosVisibles[0]);
           } else if (spotifyPistasLista.length > 0) {
@@ -2591,6 +2936,11 @@ export default function App() {
             try {
               ytPlayerRef.current.seekTo?.(nuevoSeg, true);
               setYtTiempoSeg(nuevoSeg);
+            } catch {}
+          } else if (fuente === 'video_nube' && nubeYtPlayerRef.current) {
+            try {
+              nubeYtPlayerRef.current.seekTo?.(nuevoSeg, true);
+              setNubeYtTiempoSeg(nuevoSeg);
             } catch {}
           }
         };

@@ -622,15 +622,25 @@ body {
   border-radius: 0;
 }
 
+.yt-iframe-crop-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none !important;
+}
+
 .yt-embed-container iframe,
-.yt-embed-container > #youtube-player-container,
+.yt-embed-container #youtube-player-container,
+.yt-embed-container #cloud-youtube-player-container,
 .yt-iframe-element {
   position: absolute;
-  top: 0;
+  top: -65px;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: calc(100% + 130px);
   border: none;
+  pointer-events: none !important;
+  user-select: none;
 }
 
 .yt-placeholder-screen {
@@ -1816,58 +1826,71 @@ body {
 }
 
 /* ============================================================
-   ESCUDOS ANTI-REDIRECCIÓN A YOUTUBE + OCULTADOR DE FLECHA DEL MOUSE
+   BARRA PROPIA DE CONTROLES DE VIDEO + OCULTADOR AUTOMÁTICO DE PUNTERO (2s)
+   (Cero logos ni enlaces a YouTube, tanto en vista normal como en Pantalla Completa)
 ============================================================ */
-/* Bloquea clic en el título superior / avatar / compartir incluso en Pantalla Completa */
-.yt-shield-top {
+.video-click-surface {
   position: absolute;
-  top: 0;
+  inset: 0;
+  z-index: 20;
+  background: transparent;
+  cursor: pointer;
+}
+
+.custom-video-controls-bar {
+  position: absolute;
   left: 0;
   right: 0;
-  height: 38%;
-  min-height: 135px;
-  max-height: 210px;
-  z-index: 20;
-  background: transparent;
-  cursor: default;
-}
-
-/* Bloquea la zona central-izquierda y el botón "Mirar en YouTube" al pausar, dejando libre el menú ⚙️ de Calidad a la derecha */
-.yt-shield-watch-link {
-  position: absolute;
-  top: 38%;
-  bottom: 52px;
-  left: 0;
-  right: 260px;
-  z-index: 20;
-  background: transparent;
-  cursor: default;
-}
-
-/* Tapa el logo "▶ YouTube" en la esquina inferior derecha dejando libre el engrane ⚙️ de Calidad */
-.yt-shield-logo {
-  position: absolute;
   bottom: 0;
-  right: 0;
-  width: 96px;
-  height: 46px;
-  z-index: 21;
-  background: #0b0b0b;
-  border-top-left-radius: 6px;
+  z-index: 25;
+  padding: 16px 14px 10px;
+  background: linear-gradient(
+    to top,
+    rgba(6, 6, 8, 0.96) 0%,
+    rgba(6, 6, 8, 0.8) 68%,
+    transparent 100%
+  );
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.25s ease;
+  user-select: none;
+}
+
+.custom-video-controls-bar.hidden-idle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.custom-video-seek {
+  width: 100%;
+  height: 5px;
+  margin: 0;
+  accent-color: #1db954;
+  cursor: pointer;
+}
+
+.custom-video-controls-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding-right: 10px;
-  box-sizing: border-box;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.yt-shield-fs-btn {
+.custom-video-left,
+.custom-video-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.custom-video-btn {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: #f1f1f1;
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1875,13 +1898,57 @@ body {
   transition: background 0.15s, transform 0.15s;
 }
 
-.yt-shield-fs-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+.custom-video-btn:hover {
+  background: rgba(29, 185, 84, 0.26);
+  border-color: rgba(29, 185, 84, 0.55);
   color: #ffffff;
-  transform: scale(1.06);
+  transform: scale(1.05);
 }
 
-/* Contenedor de video nativo MP4 y ocultador automático del cursor tras 2.2s */
+.custom-video-vol {
+  width: 72px;
+  height: 4px;
+  accent-color: #1db954;
+  cursor: pointer;
+}
+
+.custom-video-time {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #dcdcdc;
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.custom-video-quality {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f1f1f1;
+  padding: 4px 9px;
+  border-radius: 7px;
+  font-size: 0.78rem;
+}
+
+.custom-video-quality select {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+}
+
+.custom-video-quality select option {
+  background: #141414;
+  color: #f1f1f1;
+}
+
+/* Contenedor de video nativo MP4 y ocultador automático del cursor tras 2s */
 .native-video-wrap {
   position: relative;
   width: 100%;
@@ -1898,28 +1965,9 @@ body.video-cursor-none,
 body.video-cursor-none *,
 .yt-embed-container.cursor-hidden,
 .yt-embed-container.cursor-hidden *,
+.yt-embed-container.cursor-hidden .video-click-surface,
 .native-video-wrap.cursor-hidden,
 .native-video-wrap.cursor-hidden * {
-  cursor: none !important;
-}
-
-/* Al ocultar el puntero, desactivar pointer-events del iframe para que Chrome oculte la flecha al instante */
-.yt-embed-container.cursor-hidden iframe,
-.native-video-wrap.cursor-hidden video {
-  pointer-events: none !important;
-  cursor: none !important;
-}
-
-.video-idle-cursor-hider {
-  position: absolute;
-  inset: 0;
-  z-index: 28;
-  background: transparent;
-  pointer-events: none;
-}
-
-.video-idle-cursor-hider.active {
-  pointer-events: auto !important;
   cursor: none !important;
 }
 
