@@ -319,21 +319,100 @@ app.get('/api/spotify/refresh_token', async (req, res) => {
   }
 });
 
-app.get('/api/spotify/search', async (req, res) => {
-  const query = req.query.q;
-  const token = req.query.token;
-  if (!token) {
-    return res.status(401).json({ error: 'Token de acceso requerido' });
+// Token automático del servidor para que TODOS los usuarios vean Spotify activo sin iniciar sesión
+let spotifyServerToken = '';
+let spotifyServerTokenExp = 0;
+const cacheAudioSpotify = new Map();
+
+async function obtenerTokenServidorSpotify() {
+  if (spotifyServerToken && Date.now() < spotifyServerTokenExp) {
+    return spotifyServerToken;
   }
+  const clientId = process.env.SPOTIFY_CLIENT_ID || '0e9c3e22485f403f9ec00c279b612630';
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET || 'fc3cc124f27444bba75f9f17a68812fa';
+  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+  const response = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({ grant_type: 'client_credentials' })
+  });
+  const data = await response.json();
+  if (data && data.access_token) {
+    spotifyServerToken = data.access_token;
+    spotifyServerTokenExp = Date.now() + ((data.expires_in || 3600) - 120) * 1000;
+    return spotifyServerToken;
+  }
+  throw new Error('No se pudo obtener token de Spotify del servidor');
+}
+
+app.get('/api/spotify/search', async (req, res) => {
+  const query = String(req.query.q || '').trim();
+  if (!query) return res.json({ tracks: { items: [] } });
+
   try {
-    const endpoint = `https://api.spotify.com/v1/search?type=track,album,playlist&limit=12&q=${encodeURIComponent(query)}`;
+    const token = req.query.token || (await obtenerTokenServidorSpotify());
+    const endpoint = `https://api.spotify.com/v1/search?type=track&limit=15&q=${encodeURIComponent(query)}`;
     const spResponse = await fetch(endpoint, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const spData = await spResponse.json();
-    res.json(spData);
+    if (spData?.tracks?.items) {
+      return res.json(spData);
+    }
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.warn('Fallback en /api/spotify/search:', e.message);
+  }
+
+  // Respaldo automático si Spotify tarda o falla
+  try {
+    const r = await ytSearch(query);
+    const items = (r.videos || []).slice(0, 12).map(v => ({
+      id: v.videoId,
+      uri: `spotify:track:${v.videoId}`,
+      name: v.title,
+      duration_ms: (v.seconds || 210) * 1000,
+      artists: [{ name: v.author?.name || 'Artista' }],
+      album: {
+        name: 'Spotify Streaming',
+        images: [{ url: v.thumbnail || v.image }]
+      },
+      directVideoId: v.videoId
+    }));
+    return res.json({ tracks: { items } });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Motor de audio multiusuario para Spotify (permite que varias personas escuchen canciones completas a la vez sin cortarse)
+app.get('/api/spotify/audio', async (req, res) => {
+  const query = String(req.query.q || '').trim();
+  if (!query) return res.status(400).json({ error: 'Falta consulta de canción' });
+
+  const key = query.toLowerCase();
+  if (cacheAudioSpotify.has(key)) {
+    return res.json(cacheAudioSpotify.get(key));
+  }
+
+  try {
+    const r = await ytSearch(`${query} official audio`);
+    const mejor = (r.videos && r.videos[0]) || null;
+    if (!mejor) {
+      return res.status(404).json({ error: 'No se encontró audio para esta canción' });
+    }
+    const payload = {
+      videoId: mejor.videoId,
+      titulo: mejor.title,
+      duracionSeg: mejor.seconds || 0
+    };
+    cacheAudioSpotify.set(key, payload);
+    return res.json(payload);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
   }
 });
 

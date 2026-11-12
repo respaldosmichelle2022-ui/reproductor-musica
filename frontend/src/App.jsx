@@ -5,14 +5,16 @@ import './App.css';
 const API = import.meta.env.DEV ? 'http://localhost:8080' : '';
 
 const PLAYLISTS_SPOTIFY_RECOMENDADAS = [
-  { id: '37i9dQZF1DX10zKzsJ2jva', titulo: 'Viva Latino', desc: 'Los mayores éxitos de la música latina', emoji: '🔥', color: 'linear-gradient(135deg, #ff4e50, #f9d423)' },
-  { id: '37i9dQZF1DXcBWIGoYBM5M', titulo: 'Today\'s Top Hits', desc: 'Lo más escuchado a nivel mundial', emoji: '🌎', color: 'linear-gradient(135deg, #8e2de2, #4a00e0)' },
-  { id: '37i9dQZF1DX8SfyqmSFDwe', titulo: 'Reggaetón Old School', desc: 'Los clásicos del reggaetón de siempre', emoji: '🎤', color: 'linear-gradient(135deg, #f12711, #f5af19)' },
-  { id: '37i9dQZF1DX2apWzyECwyZ', titulo: 'This Is Bad Bunny', desc: 'Lo esencial de Bad Bunny', emoji: '🐰', color: 'linear-gradient(135deg, #11998e, #38ef7d)' },
-  { id: '37i9dQZF1DX4UtSsGT1Sbe', titulo: 'Éxitos de los 80s', desc: 'Himnos que marcaron una década', emoji: '📼', color: 'linear-gradient(135deg, #fc466b, #3f5efb)' },
-  { id: '37i9dQZF1DXbTxeAdrVG2l', titulo: 'Éxitos de los 90s', desc: 'Los grandes hits de los noventa', emoji: '💿', color: 'linear-gradient(135deg, #00c6ff, #0072ff)' },
-  { id: '37i9dQZF1DWXRqgorJj26U', titulo: 'Rock Clásico', desc: 'Leyendas del rock internacional', emoji: '🎸', color: 'linear-gradient(135deg, #434343, #000000)' },
-  { id: '37i9dQZF1DWWMOmoXKqHTD', titulo: 'Para cantar en el carro', desc: 'Canciones para cantar a todo pulmón', emoji: '🚗', color: 'linear-gradient(135deg, #f7971e, #ffd200)' }
+  { id: '37i9dQZF1DX10zKzsJ2jva', titulo: 'Viva Latino', desc: 'Los mayores éxitos de la música latina', emoji: '🔥', color: 'linear-gradient(135deg, #ff4e50, #f9d423)', query: 'Exitos Musica Latina Reggaeton Pop Latino' },
+  { id: '37i9dQZF1DXcBWIGoYBM5M', titulo: 'Today\'s Top Hits', desc: 'Lo más escuchado a nivel mundial', emoji: '🌎', color: 'linear-gradient(135deg, #8e2de2, #4a00e0)', query: 'Global Top Hits Pop 2025' },
+  { id: 'baladas-rom', titulo: 'Baladas Románticas', desc: 'Grandes canciones de amor y clásicos inolvidables', emoji: '💕', color: 'linear-gradient(135deg, #eb3349, #f45c43)', query: 'Baladas Romanticas en Español Clasicas' },
+  { id: 'cumbias-inm', titulo: 'Cumbias Inmortales', desc: 'El ritmo y sabor de las mejores cumbias para celebrar', emoji: '💃', color: 'linear-gradient(135deg, #11998e, #38ef7d)', query: 'Cumbias Inmortales Los Angeles Azules Sonora Dinamita' },
+  { id: '37i9dQZF1DX8SfyqmSFDwe', titulo: 'Reggaetón Old School', desc: 'Los clásicos del reggaetón de siempre', emoji: '🎤', color: 'linear-gradient(135deg, #f12711, #f5af19)', query: 'Reggaeton Old School Daddy Yankee Don Omar Tego' },
+  { id: '37i9dQZF1DX2apWzyECwyZ', titulo: 'This Is Bad Bunny', desc: 'Lo esencial de Bad Bunny', emoji: '🐰', color: 'linear-gradient(135deg, #00b09b, #96c93d)', query: 'Bad Bunny' },
+  { id: '37i9dQZF1DX4UtSsGT1Sbe', titulo: 'Éxitos de los 80s', desc: 'Himnos que marcaron una década', emoji: '📼', color: 'linear-gradient(135deg, #fc466b, #3f5efb)', query: 'Clasicos de los 80 en Español e Ingles' },
+  { id: '37i9dQZF1DXbTxeAdrVG2l', titulo: 'Éxitos de los 90s', desc: 'Los grandes hits de los noventa', emoji: '💿', color: 'linear-gradient(135deg, #00c6ff, #0072ff)', query: 'Exitos de los 90 en Español' },
+  { id: '37i9dQZF1DWXRqgorJj26U', titulo: 'Rock Clásico y en Español', desc: 'Leyendas del rock en español e internacional', emoji: '🎸', color: 'linear-gradient(135deg, #434343, #000000)', query: 'Rock en Español Soda Stereo Caifanes Hombres G Enanitos Verdes' },
+  { id: 'gruperas-rom', titulo: 'Gruperas y Románticas', desc: 'Los Acosta, Bronco, Temerarios y grandes ídolos', emoji: '🤠', color: 'linear-gradient(135deg, #f7971e, #ffd200)', query: 'Los Acosta Bronco Los Temerarios Los Bukis' }
 ];
 
 export default function App() {
@@ -59,7 +61,7 @@ export default function App() {
   const [ytSearchQuery, setYtSearchQuery] = useState('');
   const [ytBuscando, setYtBuscando] = useState(false);
 
-  // Spotify (Autenticación y Reproducción Oficial)
+  // Spotify (Modo Multiusuario Activo para Todos + Reproducción Completa Simultánea)
   const [spotifyToken, setSpotifyToken] = useState(() => localStorage.getItem('spotify_token') || '');
   const [spotifyUser, setSpotifyUser] = useState(null);
   const [spotifySubTab, setSpotifySubTab] = useState('recomendadas'); // 'recomendadas' | 'buscar' | 'playlists' | 'link'
@@ -67,7 +69,7 @@ export default function App() {
   const [spotifySearchResults, setSpotifySearchResults] = useState(null);
   const [spotifyBuscando, setSpotifyBuscando] = useState(false);
   const [spotifyUserPlaylists, setSpotifyUserPlaylists] = useState([]);
-  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState('https://open.spotify.com/embed/playlist/37i9dQZF1DX10zKzsJ2jva?utm_source=generator&theme=0');
+  const [spotifyEmbedUrl, setSpotifyEmbedUrl] = useState('');
   const [spotifyInput, setSpotifyInput] = useState('');
   const [spotifyPlayerDeviceId, setSpotifyPlayerDeviceId] = useState('');
   const spotifyPlayerRef = useRef(null);
@@ -77,6 +79,20 @@ export default function App() {
   const [spotifyPos, setSpotifyPos] = useState(0);
   const spotifyDeviceRef = useRef('');
   const [portadasPL, setPortadasPL] = useState({});
+
+  // Motor Multiusuario de Spotify (permite que varias personas escuchen canciones completas a la vez)
+  const [spotifyPlaylistActiva, setSpotifyPlaylistActiva] = useState(PLAYLISTS_SPOTIFY_RECOMENDADAS[0]);
+  const [spotifyPistasLista, setSpotifyPistasLista] = useState([]);
+  const [spotifyCargandoLista, setSpotifyCargandoLista] = useState(false);
+  const [spotifyTrackActual, setSpotifyTrackActual] = useState(null);
+  const [spotifyCola, setSpotifyCola] = useState([]);
+  const [spotifyIndiceCola, setSpotifyIndiceCola] = useState(0);
+  const [spotifyPausadoMulti, setSpotifyPausadoMulti] = useState(false);
+  const [spotifyCargandoAudio, setSpotifyCargandoAudio] = useState(false);
+  const [spotifyDuracionMs, setSpotifyDuracionMs] = useState(0);
+  const spotifyBgPlayerRef = useRef(null);
+  const spotifyColaRef = useRef([]);
+  const spotifyIndiceRef = useRef(0);
 
   // Búsqueda general
   const [search, setSearch] = useState('');
@@ -143,6 +159,8 @@ export default function App() {
 
   const reproducirMP3 = url => {
     try { spotifyPlayerRef.current?.pause(); } catch {}
+    try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
+    setSpotifyPausadoMulti(true);
     setCurrent(url);
     setCurrentVideo(null);
     setCurrentVideoNube(null);
@@ -150,6 +168,8 @@ export default function App() {
 
   const reproducirVideoNube = video => {
     try { spotifyPlayerRef.current?.pause(); } catch {}
+    try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
+    setSpotifyPausadoMulti(true);
     setCurrentVideoNube(video);
     setCurrentVideo(null);
     if (audioRef.current) audioRef.current.pause();
@@ -172,6 +192,8 @@ export default function App() {
 
   const reproducirYouTube = (videoId, index = 0) => {
     try { spotifyPlayerRef.current?.pause(); } catch {}
+    try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
+    setSpotifyPausadoMulti(true);
     setCurrentVideo(videoId);
     setYtIndex(index);
     setCurrentVideoNube(null);
@@ -433,21 +455,19 @@ export default function App() {
     };
   }, [ytSearchQuery]);
 
-  // Búsqueda en vivo estilo Spotify: busca mientras escribes (con pequeña pausa)
+  // Búsqueda en vivo estilo Spotify: busca mientras escribes SIN requerir inicio de sesión (Modo Multiusuario)
   useEffect(() => {
     const q = spotifySearchQuery.trim();
     if (!q) {
       setSpotifySearchResults(null);
       return;
     }
-    if (!spotifyToken) return;
     let cancelado = false;
     const t = setTimeout(async () => {
       setSpotifyBuscando(true);
       try {
-        const r = await axios.get('https://api.spotify.com/v1/search', {
-          params: { q, type: 'track,playlist', limit: 10 },
-          headers: { Authorization: `Bearer ${spotifyToken}` }
+        const r = await axios.get(`${API}/api/spotify/search`, {
+          params: { q }
         });
         if (!cancelado) {
           setSpotifySearchResults(r.data);
@@ -460,21 +480,173 @@ export default function App() {
         }
       }
       if (!cancelado) setSpotifyBuscando(false);
-    }, 350);
+    }, 320);
     return () => {
       cancelado = true;
       clearTimeout(t);
     };
-  }, [spotifySearchQuery, spotifyToken]);
+  }, [spotifySearchQuery]);
 
-  // Avance de la barra de progreso del reproductor de Spotify
+  // Avance de la barra de progreso del reproductor Multiusuario de Spotify
   useEffect(() => {
-    if (!spotifyEstado || spotifyEstado.paused) return;
-    const t = setInterval(() => setSpotifyPos(p => p + 500), 500);
+    if (!spotifyTrackActual || spotifyPausadoMulti || spotifyCargandoAudio) return;
+    const t = setInterval(() => {
+      try {
+        const curSec = spotifyBgPlayerRef.current?.getCurrentTime?.();
+        if (typeof curSec === 'number' && !Number.isNaN(curSec) && curSec > 0) {
+          setSpotifyPos(Math.floor(curSec * 1000));
+          return;
+        }
+      } catch {}
+      setSpotifyPos(p => p + 500);
+    }, 500);
     return () => clearInterval(t);
-  }, [spotifyEstado]);
+  }, [spotifyTrackActual, spotifyPausadoMulti, spotifyCargandoAudio]);
 
-  // --- SPOTIFY: Autenticación, SDK y Funciones ---
+  // Cargar canciones de la primera lista recomendada de Spotify al iniciar
+  useEffect(() => {
+    cargarListaSpotifyDestacada(PLAYLISTS_SPOTIFY_RECOMENDADAS[0], false);
+  }, []);
+
+  const cargarListaSpotifyDestacada = async (pl, autoReproducir = false) => {
+    setSpotifyPlaylistActiva(pl);
+    setSpotifyCargandoLista(true);
+    setSpotifyError('');
+    try {
+      const r = await axios.get(`${API}/api/spotify/search`, {
+        params: { q: pl.query || pl.titulo }
+      });
+      const pistas = r.data?.tracks?.items || [];
+      setSpotifyPistasLista(pistas);
+      if (autoReproducir && pistas.length > 0) {
+        reproducirPistaSpotifyMulti(pistas[0], pistas, 0);
+      }
+    } catch (e) {
+      console.error('Error cargando lista de Spotify:', e);
+    }
+    setSpotifyCargandoLista(false);
+  };
+
+  const reproducirPistaSpotifyMulti = async (track, cola = [], idx = 0) => {
+    if (!track) return;
+    if (audioRef.current) audioRef.current.pause();
+    try { spotifyPlayerRef.current?.pause(); } catch {}
+    setCurrentVideo(null);
+    setCurrentVideoNube(null);
+    setSpotifyEmbedUrl('');
+
+    const listaEfectiva = cola && cola.length > 0 ? cola : [track];
+    setSpotifyTrackActual(track);
+    setSpotifyCola(listaEfectiva);
+    setSpotifyIndiceCola(idx);
+    spotifyColaRef.current = listaEfectiva;
+    spotifyIndiceRef.current = idx;
+    setSpotifyDuracionMs(track.duration_ms || 210000);
+    setSpotifyPos(0);
+    setSpotifyPausadoMulti(false);
+    setSpotifyCargandoAudio(true);
+    setSpotifyError('');
+
+    const artistas = track.artists?.map(a => a.name).join(' ') || '';
+    const consulta = `${track.name} ${artistas}`.trim();
+
+    try {
+      const r = await axios.get(`${API}/api/spotify/audio`, {
+        params: { q: consulta }
+      });
+      const videoId = r.data?.videoId;
+      if (!videoId) throw new Error('No se encontró fuente de audio para esta pista');
+
+      // Esperar a que la API de YouTube esté lista si aún está cargando
+      for (let i = 0; i < 20 && (!window.YT || !window.YT.Player); i++) {
+        await new Promise(res => setTimeout(res, 200));
+      }
+
+      if (spotifyBgPlayerRef.current && typeof spotifyBgPlayerRef.current.loadVideoById === 'function') {
+        spotifyBgPlayerRef.current.loadVideoById(videoId);
+        spotifyBgPlayerRef.current.playVideo();
+      } else if (window.YT && window.YT.Player) {
+        spotifyBgPlayerRef.current = new window.YT.Player('spotify-hidden-audio-engine', {
+          height: '1',
+          width: '1',
+          videoId,
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            rel: 0,
+            playsinline: 1
+          },
+          events: {
+            onReady: ev => {
+              try {
+                ev.target.setVolume(100);
+                ev.target.playVideo();
+              } catch {}
+            },
+            onStateChange: ev => {
+              if (ev.data === 1) {
+                setSpotifyCargandoAudio(false);
+                setSpotifyPausadoMulti(false);
+                try {
+                  const durSec = ev.target.getDuration?.();
+                  if (durSec && durSec > 0) setSpotifyDuracionMs(Math.floor(durSec * 1000));
+                } catch {}
+              } else if (ev.data === 2) {
+                setSpotifyPausadoMulti(true);
+              } else if (ev.data === 0) {
+                // Avanzar automáticamente a la siguiente canción de la cola
+                const c = spotifyColaRef.current || [];
+                if (c.length > 0) {
+                  const sigIdx = (spotifyIndiceRef.current + 1) % c.length;
+                  reproducirPistaSpotifyMulti(c[sigIdx], c, sigIdx);
+                }
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Error iniciando audio multiusuario Spotify:', e);
+      setSpotifyCargandoAudio(false);
+      setSpotifyError('No se pudo cargar el audio de esta canción, intenta con otra.');
+    }
+  };
+
+  const togglePlaySpotifyMulti = () => {
+    if (!spotifyBgPlayerRef.current) return;
+    try {
+      if (spotifyPausadoMulti) {
+        spotifyBgPlayerRef.current.playVideo?.();
+        setSpotifyPausadoMulti(false);
+      } else {
+        spotifyBgPlayerRef.current.pauseVideo?.();
+        setSpotifyPausadoMulti(true);
+      }
+    } catch {}
+  };
+
+  const siguientePistaSpotifyMulti = () => {
+    const c = spotifyColaRef.current || spotifyCola;
+    if (!c || c.length === 0) return;
+    const sigIdx = (spotifyIndiceRef.current + 1) % c.length;
+    reproducirPistaSpotifyMulti(c[sigIdx], c, sigIdx);
+  };
+
+  const anteriorPistaSpotifyMulti = () => {
+    const c = spotifyColaRef.current || spotifyCola;
+    if (!c || c.length === 0) return;
+    const antIdx = (spotifyIndiceRef.current - 1 + c.length) % c.length;
+    reproducirPistaSpotifyMulti(c[antIdx], c, antIdx);
+  };
+
+  const adelantarSpotifyMulti = nuevoMs => {
+    setSpotifyPos(nuevoMs);
+    try {
+      spotifyBgPlayerRef.current?.seekTo?.(Math.floor(nuevoMs / 1000), true);
+    } catch {}
+  };
+
+  // --- SPOTIFY: Autenticación opcional, SDK y Funciones ---
   useEffect(() => {
     // Revisar si volvemos del login de Spotify en el hash
     const hash = window.location.hash;
@@ -499,8 +671,7 @@ export default function App() {
       return;
     }
 
-    // 1. Perfil del usuario
-    let cancelado = false; // evita que respuestas de un token viejo pisen al nuevo
+    let cancelado = false;
     setSpotifyError('');
     axios.get('https://api.spotify.com/v1/me', {
       headers: { Authorization: `Bearer ${spotifyToken}` }
@@ -511,9 +682,7 @@ export default function App() {
     }).catch(async err => {
       if (cancelado) return;
       const status = err.response?.status;
-      const msg = (typeof err.response?.data === 'string' ? err.response.data : (err.response?.data?.error?.message || (err.response?.data ? JSON.stringify(err.response.data) : err.message)));
       if (status === 401) {
-        // Token vencido: intentar renovarlo con el refresh_token
         const refresh = localStorage.getItem('spotify_refresh_token');
         if (refresh) {
           try {
@@ -527,12 +696,9 @@ export default function App() {
           } catch {}
         }
         cerrarSesionSpotify();
-      } else {
-        setSpotifyError(`Spotify respondió ${status || ''}: ${msg}`);
       }
     });
 
-    // 2. Playlists del usuario
     axios.get('https://api.spotify.com/v1/me/playlists?limit=30', {
       headers: { Authorization: `Bearer ${spotifyToken}` }
     }).then(r => {
@@ -540,61 +706,8 @@ export default function App() {
       setSpotifyUserPlaylists(r.data.items || []);
     }).catch(console.error);
 
-    // 3. Inicializar Web Playback SDK
-    const initPlayer = () => {
-      if (!window.Spotify || !window.Spotify.Player || spotifyPlayerRef.current) return;
-      try {
-        const player = new window.Spotify.Player({
-          name: 'Reproductor Multimedia Cloud',
-          getOAuthToken: cb => cb(spotifyToken),
-          volume: 0.8
-        });
-
-        player.addListener('ready', ({ device_id }) => {
-          spotifyDeviceRef.current = device_id;
-          setSpotifyPlayerDeviceId(device_id);
-        });
-
-        player.addListener('not_ready', () => {
-          spotifyDeviceRef.current = '';
-          setSpotifyPlayerDeviceId('');
-        });
-
-        player.addListener('player_state_changed', st => {
-          if (!st) return;
-          setSpotifyEstado(st);
-          setSpotifyPos(st.position);
-        });
-
-        player.addListener('authentication_error', () => {
-          setSpotifyError('Spotify: error de autenticación en el reproductor. Cierra sesión e inicia de nuevo.');
-        });
-        player.addListener('account_error', () => {
-          setSpotifyError('Spotify: la reproducción completa requiere una cuenta Premium.');
-        });
-        player.addListener('initialization_error', () => {
-          setSpotifyError('Tu navegador no permite el reproductor de Spotify (se usará el reproductor alterno).');
-        });
-
-        player.connect();
-        spotifyPlayerRef.current = player;
-      } catch (e) {
-        console.warn('Error al iniciar Spotify SDK:', e);
-      }
-    };
-
-    if (window.Spotify && window.Spotify.Player) {
-      initPlayer();
-    } else {
-      window.onSpotifyWebPlaybackSDKReady = initPlayer;
-    }
-
     return () => {
       cancelado = true;
-      if (spotifyPlayerRef.current) {
-        try { spotifyPlayerRef.current.disconnect(); } catch {}
-        spotifyPlayerRef.current = null;
-      }
     };
   }, [spotifyToken]);
 
@@ -618,67 +731,37 @@ export default function App() {
 
   const pausarSpotify = () => {
     try { spotifyPlayerRef.current?.pause(); } catch {}
+    try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
+    setSpotifyPausadoMulti(true);
   };
 
   const reproducirContextoSpotify = async (uriOrId, tipo = 'playlist') => {
     if (audioRef.current) audioRef.current.pause();
+    try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
+    setSpotifyPausadoMulti(true);
+    setSpotifyTrackActual(null);
     setCurrentVideo(null);
     setCurrentVideoNube(null);
 
     const uri = uriOrId.startsWith('spotify:') ? uriOrId : `spotify:${tipo}:${uriOrId}`;
     const [, tipoReal, id] = uri.split(':');
-
-    // Con sesión Premium: reproducir completo dentro de la página con el SDK oficial
-    if (spotifyToken && spotifyPlayerRef.current) {
-      try {
-        // El navegador exige un clic del usuario para permitir audio
-        if (typeof spotifyPlayerRef.current.activateElement === 'function') {
-          await spotifyPlayerRef.current.activateElement();
-        }
-        let device = spotifyDeviceRef.current;
-        for (let i = 0; i < 20 && !device; i++) {
-          await new Promise(res => setTimeout(res, 250));
-          device = spotifyDeviceRef.current;
-        }
-        if (!device) throw new Error('El reproductor de Spotify aún no está listo, intenta de nuevo');
-        await axios.put(
-          `https://api.spotify.com/v1/me/player/play?device_id=${device}`,
-          tipoReal === 'track' ? { uris: [uri] } : { context_uri: uri },
-          { headers: { Authorization: `Bearer ${spotifyToken}` } }
-        );
-        setSpotifySDKActivo(true);
-        setSpotifyError('');
-        return;
-      } catch (e) {
-        const status = e.response?.status;
-        const msg = e.response?.data?.error?.message || e.message;
-        setSpotifyError(`No se pudo iniciar la reproducción completa (${status || ''} ${msg}). Se usó el reproductor alterno.`);
-      }
-    }
-
-    // Respaldo: reproductor embebido oficial (sin sesión o si falla el SDK)
     setSpotifySDKActivo(false);
     setSpotifyEmbedUrl(`https://open.spotify.com/embed/${tipoReal}/${id}?utm_source=generator&theme=0`);
   };
+
   const buscarSpotify = async () => {
     if (!spotifySearchQuery.trim()) return;
-    if (!spotifyToken) {
-      setSpotifyError('Para buscar canciones primero debes iniciar sesión con Spotify (botón verde de arriba).');
-      return;
-    }
     setSpotifyBuscando(true);
     setSpotifyError('');
     try {
-      const r = await axios.get('https://api.spotify.com/v1/search', {
-        params: { q: spotifySearchQuery, type: 'track,playlist', limit: 10 },
-        headers: { Authorization: `Bearer ${spotifyToken}` }
+      const r = await axios.get(`${API}/api/spotify/search`, {
+        params: { q: spotifySearchQuery }
       });
       setSpotifySearchResults(r.data);
     } catch (e) {
       console.error('Error buscando en Spotify:', e);
       const status = e.response?.status;
-      const msg = (typeof e.response?.data === 'string' ? e.response.data : (e.response?.data?.error?.message || (e.response?.data ? JSON.stringify(e.response.data) : e.message)));
-      setSpotifyError(`La búsqueda falló (${status || 'sin conexión'}): ${msg}`);
+      setSpotifyError(`La búsqueda falló (${status || 'sin conexión'})`);
     }
     setSpotifyBuscando(false);
   };
@@ -1367,7 +1450,7 @@ export default function App() {
         );
       })()}
 
-      {/* PESTAÑA: SPOTIFY (DISEÑO OFICIAL IDÉNTICO) */}
+      {/* PESTAÑA: SPOTIFY (MODO PREMIUM MULTIUSUARIO ACTIVO PARA TODOS) */}
       {tab === 'spotify' && (
         <section className="section-content spotify-main-section">
           {/* Header Superior Oficial de Spotify */}
@@ -1379,44 +1462,26 @@ export default function App() {
               <div>
                 <h2 className="spotify-title-main">Spotify</h2>
                 <span className="spotify-sub-status">
-                  {spotifyUser ? `Sesión iniciada con: ${spotifyUser.display_name}` : 'Música oficial en Streaming'}
+                  Catálogo Oficial • Reproducción Completa Simultánea sin cortes
                 </span>
               </div>
             </div>
 
-            {/* Acciones de Usuario: Iniciar Sesión / Cerrar Sesión */}
+            {/* Insignia Premium Multiusuario Activo para Todos los Visitantes */}
             <div className="spotify-user-actions">
-              {spotifyUser ? (
-                <div className="spotify-profile-badge">
-                  {spotifyUser.images && spotifyUser.images[0] ? (
-                    <img src={spotifyUser.images[0].url} alt={spotifyUser.display_name} className="spotify-avatar" />
-                  ) : (
-                    <div className="spotify-avatar-fallback">
-                      {spotifyUser.display_name ? spotifyUser.display_name.charAt(0).toUpperCase() : 'U'}
-                    </div>
-                  )}
-                  <div className="spotify-profile-info">
-                    <span className="spotify-user-name">{spotifyUser.display_name}</span>
-                    <span className={`badge-subscription ${spotifyUser.product === 'premium' ? 'premium' : 'free'}`}>
-                      {spotifyUser.product === 'premium' ? '👑 PREMIUM' : 'GRATIS'}
-                    </span>
-                  </div>
-                  <button
-                    className="btn-spotify-logout"
-                    onClick={cerrarSesionSpotify}
-                    title="Cerrar sesión actual para entrar con otra cuenta de prueba"
-                  >
-                    Cerrar sesión
-                  </button>
+              <div className="spotify-profile-badge">
+                <div className="spotify-avatar-fallback" style={{ background: '#1DB954', color: '#000', fontWeight: 800 }}>
+                  ★
                 </div>
-              ) : (
-                <button className="btn-spotify-login" onClick={loginSpotify}>
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.502 17.307c-.218.358-.684.471-1.042.253-2.857-1.745-6.455-2.141-10.693-1.173-.41.094-.82-.162-.914-.572-.094-.41.162-.82.572-.914 4.636-1.059 8.604-.614 11.824 1.364.358.218.471.684.253 1.042zm1.47-3.267c-.275.447-.859.589-1.306.314-3.272-2.012-8.259-2.594-12.128-1.419-.504.153-1.041-.137-1.194-.641-.153-.504.137-1.041.641-1.194 4.417-1.341 9.907-.692 13.673 1.634.447.275.589.859.314 1.306zm.126-3.41c-3.924-2.33-10.388-2.544-14.136-1.406-.601.182-1.243-.167-1.425-.768-.182-.601.167-1.243.768-1.425 4.312-1.309 11.442-1.062 15.945 1.611.541.321.719 1.026.398 1.567-.321.541-1.026.719-1.567.398z"/>
-                  </svg>
-                  Iniciar sesión con Spotify
-                </button>
-              )}
+                <div className="spotify-profile-info">
+                  <span className="spotify-user-name">
+                    {spotifyUser?.display_name || 'Cuenta Cloud Activa'}
+                  </span>
+                  <span className="badge-subscription premium">
+                    👑 PREMIUM MULTIUSUARIO
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1425,6 +1490,43 @@ export default function App() {
               ⚠️ {spotifyError}
             </div>
           )}
+
+          {/* Buscador en Vivo Permanente arriba de Spotify */}
+          <div className="spotify-search-bar" style={{ marginBottom: 18 }}>
+            <input
+              placeholder="🔍 ¿Qué canción o artista quieres escuchar hoy? Escribe aquí y saldrá al instante..."
+              value={spotifySearchQuery}
+              onChange={e => {
+                setSpotifySearchQuery(e.target.value);
+                if (e.target.value.trim() && spotifySubTab !== 'buscar') {
+                  setSpotifySubTab('buscar');
+                }
+              }}
+              onKeyDown={e => e.key === 'Enter' && buscarSpotify()}
+            />
+            {spotifySearchQuery && (
+              <button
+                className="btn-spotify-logout"
+                onClick={() => {
+                  setSpotifySearchQuery('');
+                  setSpotifySearchResults(null);
+                  setSpotifySubTab('recomendadas');
+                }}
+              >
+                ✕ Limpiar
+              </button>
+            )}
+            <button
+              className="btn-spotify-small"
+              onClick={() => {
+                setSpotifySubTab('buscar');
+                buscarSpotify();
+              }}
+              disabled={spotifyBuscando}
+            >
+              {spotifyBuscando ? 'Buscando...' : 'Buscar'}
+            </button>
+          </div>
 
           {/* Subpestañas estilo Spotify */}
           <div className="spotify-nav-pills">
@@ -1438,16 +1540,8 @@ export default function App() {
               className={`pill-btn ${spotifySubTab === 'buscar' ? 'active' : ''}`}
               onClick={() => setSpotifySubTab('buscar')}
             >
-              🔍 Buscar en Spotify
+              🔍 Resultados de Búsqueda
             </button>
-            {spotifyUser && (
-              <button
-                className={`pill-btn ${spotifySubTab === 'playlists' ? 'active' : ''}`}
-                onClick={() => setSpotifySubTab('playlists')}
-              >
-                📚 Mis Playlists ({spotifyUserPlaylists.length})
-              </button>
-            )}
             <button
               className={`pill-btn ${spotifySubTab === 'link' ? 'active' : ''}`}
               onClick={() => setSpotifySubTab('link')}
@@ -1456,36 +1550,88 @@ export default function App() {
             </button>
           </div>
 
-          {/* Reproductor propio (SDK oficial, canciones completas con Premium) */}
-          {spotifySDKActivo && spotifyEstado?.track_window?.current_track ? (() => {
-            const pista = spotifyEstado.track_window.current_track;
-            const dur = spotifyEstado.duration || pista.duration_ms || 0;
+          {/* Reproductor Multiusuario de Spotify (Canciones Completas para Varios Usuarios a la vez) */}
+          {spotifyTrackActual ? (() => {
+            const dur = spotifyDuracionMs || spotifyTrackActual.duration_ms || 210000;
             const fmt = ms => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
             return (
-              <div className="spotify-active-embed-box" style={{ background: 'linear-gradient(135deg,#1f3a2a,#181818)', borderRadius: 12, padding: 20, display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-                <img src={pista.album?.images?.[2]?.url || pista.album?.images?.[0]?.url} alt={pista.name} style={{ width: 150, height: 150, borderRadius: 8, objectFit: 'cover' }} />
+              <div
+                className="spotify-active-embed-box"
+                style={{
+                  background: 'linear-gradient(135deg,#193b27,#121212)',
+                  border: '1px solid rgba(29,185,84,0.35)',
+                  borderRadius: 14,
+                  padding: 20,
+                  display: 'flex',
+                  gap: 20,
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  marginBottom: 22
+                }}
+              >
+                <img
+                  src={spotifyTrackActual.album?.images?.[0]?.url || spotifyTrackActual.album?.images?.[2]?.url}
+                  alt={spotifyTrackActual.name}
+                  style={{ width: 135, height: 135, borderRadius: 10, objectFit: 'cover', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}
+                />
                 <div style={{ flex: 1, minWidth: 240 }}>
-                  <div style={{ fontSize: 12, color: '#1DB954', fontWeight: 700, letterSpacing: 1 }}>REPRODUCIENDO EN SPOTIFY</div>
-                  <h2 style={{ margin: '6px 0 2px', fontSize: 26 }}>{pista.name}</h2>
-                  <div style={{ color: '#b3b3b3', marginBottom: 14 }}>{pista.artists?.map(a => a.name).join(', ')}</div>
+                  <div style={{ fontSize: 12, color: '#1DB954', fontWeight: 700, letterSpacing: 1 }}>
+                    {spotifyCargandoAudio
+                      ? '⏳ CONECTANDO AUDIO COMPLETO...'
+                      : '🟢 REPRODUCIENDO EN SPOTIFY • MODO MULTIUSUARIO'}
+                  </div>
+                  <h2 style={{ margin: '6px 0 2px', fontSize: 24 }}>{spotifyTrackActual.name}</h2>
+                  <div style={{ color: '#b3b3b3', marginBottom: 14 }}>
+                    {spotifyTrackActual.artists?.map(a => a.name).join(', ')}
+                    {spotifyTrackActual.album?.name ? ` • ${spotifyTrackActual.album.name}` : ''}
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 12, color: '#b3b3b3', width: 36 }}>{fmt(spotifyPos)}</span>
+                    <span style={{ fontSize: 12, color: '#b3b3b3', width: 38 }}>{fmt(spotifyPos)}</span>
                     <input
                       type="range"
                       min={0}
                       max={dur}
                       value={Math.min(spotifyPos, dur)}
-                      onChange={e => { setSpotifyPos(Number(e.target.value)); spotifyPlayerRef.current?.seek(Number(e.target.value)); }}
-                      style={{ flex: 1, accentColor: '#1DB954' }}
+                      onChange={e => adelantarSpotifyMulti(Number(e.target.value))}
+                      style={{ flex: 1, accentColor: '#1DB954', cursor: 'pointer' }}
                     />
-                    <span style={{ fontSize: 12, color: '#b3b3b3', width: 36 }}>{fmt(dur)}</span>
+                    <span style={{ fontSize: 12, color: '#b3b3b3', width: 38 }}>{fmt(dur)}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 18, alignItems: 'center', marginTop: 12 }}>
-                    <button onClick={() => spotifyPlayerRef.current?.previousTrack()} title="Anterior" style={{ background: 'none', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer' }}>⏮</button>
-                    <button onClick={() => spotifyPlayerRef.current?.togglePlay()} title={spotifyEstado.paused ? 'Reproducir' : 'Pausar'} style={{ width: 56, height: 56, borderRadius: '50%', border: 'none', background: '#fff', color: '#000', fontSize: 24, cursor: 'pointer' }}>
-                      {spotifyEstado.paused ? '▶' : '⏸'}
+                    <button
+                      onClick={anteriorPistaSpotifyMulti}
+                      title="Canción anterior"
+                      style={{ background: 'none', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer' }}
+                    >
+                      ⏮
                     </button>
-                    <button onClick={() => spotifyPlayerRef.current?.nextTrack()} title="Siguiente" style={{ background: 'none', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer' }}>⏭</button>
+                    <button
+                      onClick={togglePlaySpotifyMulti}
+                      title={spotifyPausadoMulti ? 'Reproducir' : 'Pausar'}
+                      style={{
+                        width: 54,
+                        height: 54,
+                        borderRadius: '50%',
+                        border: 'none',
+                        background: '#1DB954',
+                        color: '#000',
+                        fontSize: 22,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {spotifyCargandoAudio ? '⏳' : spotifyPausadoMulti ? '▶' : '⏸'}
+                    </button>
+                    <button
+                      onClick={siguientePistaSpotifyMulti}
+                      title="Siguiente canción"
+                      style={{ background: 'none', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer' }}
+                    >
+                      ⏭
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1505,117 +1651,170 @@ export default function App() {
             </div>
           )}
 
-          {/* Vista 1: RECOMENDADAS */}
+          {/* Vista 1: RECOMENDADAS + LISTA DE CANCIONES DE LA PLAYLIST SELECCIONADA */}
           {spotifySubTab === 'recomendadas' && (
             <div className="spotify-content-block">
-              <h3 className="spotify-section-heading">Listas de reproducción destacadas</h3>
+              <h3 className="spotify-section-heading">Listas de reproducción destacadas (haz clic para escuchar)</h3>
               <div className="spotify-grid">
-                {PLAYLISTS_SPOTIFY_RECOMENDADAS.map(pl => (
-                  <div
-                    key={pl.id}
-                    className="spotify-card"
-                    onClick={() => reproducirContextoSpotify(pl.id, 'playlist')}
-                  >
-                    <div className="spotify-card-cover-wrap">
-                      <div className="spotify-card-img" style={{ background: pl.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 56, aspectRatio: '1 / 1', borderRadius: 8 }}>{pl.emoji}</div>
-                      <button className="spotify-play-hover-btn" title="Reproducir en Spotify">
-                        ▶
-                      </button>
-                    </div>
-                    <div className="spotify-card-text">
-                      <h4>{pl.titulo}</h4>
-                      <p>{pl.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Vista 2: BUSCADOR */}
-          {spotifySubTab === 'buscar' && (
-            <div className="spotify-content-block">
-              <div className="spotify-search-bar">
-                <input
-                  placeholder="¿Qué quieres escuchar? Empieza a escribir..."
-                  autoFocus
-                  value={spotifySearchQuery}
-                  onChange={e => setSpotifySearchQuery(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && buscarSpotify()}
-                />
-                <button className="btn-spotify-small" onClick={buscarSpotify} disabled={spotifyBuscando}>
-                  {spotifyBuscando ? 'Buscando...' : 'Buscar'}
-                </button>
-              </div>
-
-              {spotifySearchResults?.tracks?.items && (
-                <div className="spotify-results-section">
-                  <h3 className="spotify-section-heading">Canciones</h3>
-                  <div className="spotify-tracks-table">
-                    {spotifySearchResults.tracks.items.map((t, idx) => (
-                      <div
-                        key={t.id}
-                        className="spotify-track-row"
-                        onClick={() => reproducirContextoSpotify(t.uri || t.id, 'track')}
-                      >
-                        <span className="track-idx">{idx + 1}</span>
-                        <img
-                          src={t.album?.images?.[2]?.url || t.album?.images?.[0]?.url}
-                          alt={t.name}
-                          className="spotify-track-thumb"
-                        />
-                        <div className="spotify-track-names">
-                          <span className="track-title-bold">{t.name}</span>
-                          <span className="track-artist-sub">{t.artists?.map(a => a.name).join(', ')}</span>
-                        </div>
-                        <span className="track-album-sub">{t.album?.name}</span>
-                        <span className="track-dur">
-                          {Math.floor(t.duration_ms / 60000)}:
-                          {String(Math.floor((t.duration_ms % 60000) / 1000)).padStart(2, '0')}
-                        </span>
-                        <button className="btn-play-row" title="Reproducir">▶</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Vista 3: MIS PLAYLISTS */}
-          {spotifySubTab === 'playlists' && (
-            <div className="spotify-content-block">
-              <h3 className="spotify-section-heading">Tus Listas de Reproducción Guardadas</h3>
-              {spotifyUserPlaylists.length === 0 ? (
-                <p className="empty-notice">No se encontraron playlists en esta cuenta.</p>
-              ) : (
-                <div className="spotify-grid">
-                  {spotifyUserPlaylists.map(pl => (
+                {PLAYLISTS_SPOTIFY_RECOMENDADAS.map(pl => {
+                  const activa = spotifyPlaylistActiva?.id === pl.id;
+                  return (
                     <div
                       key={pl.id}
                       className="spotify-card"
-                      onClick={() => reproducirContextoSpotify(pl.id, 'playlist')}
+                      style={activa ? { outline: '2px solid #1DB954', background: '#242424' } : undefined}
+                      onClick={() => cargarListaSpotifyDestacada(pl, true)}
                     >
                       <div className="spotify-card-cover-wrap">
-                        {pl.images?.[0] ? (
-                          <img src={pl.images[0].url} alt={pl.name} className="spotify-card-img" />
-                        ) : (
-                          <div className="spotify-card-img placeholder">🎵</div>
-                        )}
-                        <button className="spotify-play-hover-btn" title="Reproducir">▶</button>
+                        <div
+                          className="spotify-card-img"
+                          style={{
+                            background: pl.color,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 56,
+                            aspectRatio: '1 / 1',
+                            borderRadius: 8
+                          }}
+                        >
+                          {pl.emoji}
+                        </div>
+                        <button className="spotify-play-hover-btn" title="Reproducir lista completa">
+                          ▶
+                        </button>
                       </div>
                       <div className="spotify-card-text">
-                        <h4>{pl.name}</h4>
-                        <p>{pl.tracks?.total || 0} canciones • De {pl.owner?.display_name || 'Spotify'}</p>
+                        <h4>{pl.titulo}</h4>
+                        <p>{pl.desc}</p>
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
+              </div>
+
+              {/* Canciones de la lista destacada seleccionada */}
+              {spotifyPlaylistActiva && (
+                <div className="spotify-results-section" style={{ marginTop: 28 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                    <h3 className="spotify-section-heading" style={{ margin: 0 }}>
+                      {spotifyPlaylistActiva.emoji} Canciones de: {spotifyPlaylistActiva.titulo}
+                    </h3>
+                    {spotifyPistasLista.length > 0 && (
+                      <button
+                        className="btn-spotify-small"
+                        onClick={() => reproducirPistaSpotifyMulti(spotifyPistasLista[0], spotifyPistasLista, 0)}
+                      >
+                        ▶ Reproducir toda la lista
+                      </button>
+                    )}
+                  </div>
+
+                  {spotifyCargandoLista ? (
+                    <p className="empty-notice">Cargando canciones de {spotifyPlaylistActiva.titulo}...</p>
+                  ) : (
+                    <div className="spotify-tracks-table">
+                      {spotifyPistasLista.map((t, idx) => {
+                        const esActiva = spotifyTrackActual?.id === t.id;
+                        return (
+                          <div
+                            key={`${t.id}-${idx}`}
+                            className="spotify-track-row"
+                            style={esActiva ? { background: 'rgba(29,185,84,0.18)', borderLeft: '3px solid #1DB954' } : undefined}
+                            onClick={() => reproducirPistaSpotifyMulti(t, spotifyPistasLista, idx)}
+                          >
+                            <span className="track-idx" style={esActiva ? { color: '#1DB954', fontWeight: 800 } : undefined}>
+                              {esActiva ? '▶' : idx + 1}
+                            </span>
+                            <img
+                              src={t.album?.images?.[2]?.url || t.album?.images?.[0]?.url}
+                              alt={t.name}
+                              className="spotify-track-thumb"
+                            />
+                            <div className="spotify-track-names">
+                              <span className="track-title-bold" style={esActiva ? { color: '#1DB954' } : undefined}>
+                                {t.name}
+                              </span>
+                              <span className="track-artist-sub">{t.artists?.map(a => a.name).join(', ')}</span>
+                            </div>
+                            <span className="track-album-sub">{t.album?.name}</span>
+                            <span className="track-dur">
+                              {Math.floor((t.duration_ms || 0) / 60000)}:
+                              {String(Math.floor(((t.duration_ms || 0) % 60000) / 1000)).padStart(2, '0')}
+                            </span>
+                            <button className="btn-play-row" title="Reproducir canción completa">
+                              {esActiva && !spotifyPausadoMulti ? '⏸' : '▶'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {/* Vista 4: PEGAR ENLACE DIRECTO */}
+          {/* Vista 2: RESULTADOS DEL BUSCADOR EN VIVO */}
+          {spotifySubTab === 'buscar' && (
+            <div className="spotify-content-block">
+              {!spotifySearchQuery.trim() ? (
+                <p className="empty-notice">
+                  Escribe el nombre de cualquier canción, artista o grupo en el buscador de arriba para escucharla completa al instante.
+                </p>
+              ) : spotifyBuscando && !spotifySearchResults ? (
+                <p className="empty-notice">Buscando "{spotifySearchQuery}" en el catálogo de Spotify...</p>
+              ) : (
+                spotifySearchResults?.tracks?.items && (
+                  <div className="spotify-results-section">
+                    <h3 className="spotify-section-heading">
+                      Canciones encontradas para "{spotifySearchQuery}" (clic para escuchar completa)
+                    </h3>
+                    <div className="spotify-tracks-table">
+                      {spotifySearchResults.tracks.items.map((t, idx) => {
+                        const esActiva = spotifyTrackActual?.id === t.id;
+                        return (
+                          <div
+                            key={`${t.id}-${idx}`}
+                            className="spotify-track-row"
+                            style={esActiva ? { background: 'rgba(29,185,84,0.18)', borderLeft: '3px solid #1DB954' } : undefined}
+                            onClick={() =>
+                              reproducirPistaSpotifyMulti(t, spotifySearchResults.tracks.items, idx)
+                            }
+                          >
+                            <span className="track-idx" style={esActiva ? { color: '#1DB954', fontWeight: 800 } : undefined}>
+                              {esActiva ? '▶' : idx + 1}
+                            </span>
+                            <img
+                              src={t.album?.images?.[2]?.url || t.album?.images?.[0]?.url}
+                              alt={t.name}
+                              className="spotify-track-thumb"
+                            />
+                            <div className="spotify-track-names">
+                              <span className="track-title-bold" style={esActiva ? { color: '#1DB954' } : undefined}>
+                                {t.name}
+                              </span>
+                              <span className="track-artist-sub">{t.artists?.map(a => a.name).join(', ')}</span>
+                            </div>
+                            <span className="track-album-sub">{t.album?.name}</span>
+                            <span className="track-dur">
+                              {Math.floor((t.duration_ms || 0) / 60000)}:
+                              {String(Math.floor(((t.duration_ms || 0) % 60000) / 1000)).padStart(2, '0')}
+                            </span>
+                            <button className="btn-play-row" title="Reproducir">
+                              {esActiva && !spotifyPausadoMulti ? '⏸' : '▶'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
+          {/* Vista 3: PEGAR ENLACE DIRECTO */}
           {spotifySubTab === 'link' && (
             <div className="spotify-box">
               <h3>Pegar enlace de Spotify</h3>
@@ -1637,6 +1836,22 @@ export default function App() {
           )}
         </section>
       )}
+
+      {/* Motor invisible de audio para reproducción simultánea multiusuario de Spotify */}
+      <div
+        style={{
+          width: 1,
+          height: 1,
+          opacity: 0,
+          position: 'fixed',
+          bottom: 0,
+          right: 0,
+          pointerEvents: 'none',
+          overflow: 'hidden'
+        }}
+      >
+        <div id="spotify-hidden-audio-engine" />
+      </div>
     </div>
   );
 }
