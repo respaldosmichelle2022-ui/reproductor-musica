@@ -328,8 +328,8 @@ async function obtenerTokenServidorSpotify() {
   if (spotifyServerToken && Date.now() < spotifyServerTokenExp) {
     return spotifyServerToken;
   }
-  const clientId = process.env.SPOTIFY_CLIENT_ID || '0e9c3e22485f403f9ec00c279b612630';
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET || 'fc3cc124f27444bba75f9f17a68812fa';
+  const clientId = (process.env.SPOTIFY_CLIENT_ID || '0e9c3e22485f403f9ec00c279b612630').trim();
+  const clientSecret = (process.env.SPOTIFY_CLIENT_SECRET || 'fc3cc124f27444bba75f9f17a68812fa').trim();
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
   const response = await fetch('https://accounts.spotify.com/api/token', {
@@ -355,7 +355,7 @@ app.get('/api/spotify/search', async (req, res) => {
 
   try {
     const token = req.query.token || (await obtenerTokenServidorSpotify());
-    const endpoint = `https://api.spotify.com/v1/search?type=track&limit=15&q=${encodeURIComponent(query)}`;
+    const endpoint = `https://api.spotify.com/v1/search?type=track&limit=10&q=${encodeURIComponent(query)}`;
     const spResponse = await fetch(endpoint, {
       headers: { Authorization: `Bearer ${token}` }
     });
