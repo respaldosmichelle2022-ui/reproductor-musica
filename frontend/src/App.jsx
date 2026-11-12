@@ -53,13 +53,19 @@ export default function App() {
   const [paseGenerado, setPaseGenerado] = useState(null);
   const [copiadoPase, setCopiadoPase] = useState(false);
 
-  // YouTube
+  // YouTube (con Modo Operativo Anti-Distracción protegible con contraseña)
   const [ytVideos, setYtVideos] = useState([]);
   const [currentVideo, setCurrentVideo] = useState(null);
   const [ytIndex, setYtIndex] = useState(0);
   const [modoRadioYT, setModoRadioYT] = useState(true);
   const [ytSearchQuery, setYtSearchQuery] = useState('');
   const [ytBuscando, setYtBuscando] = useState(false);
+  const [ytPantallaBloqueada, setYtPantallaBloqueada] = useState(true);
+  const [ytPausado, setYtPausado] = useState(false);
+  const [modalDesbloquearYT, setModalDesbloquearYT] = useState(false);
+  const [inputClaveYT, setInputClaveYT] = useState('');
+  const [errorClaveYT, setErrorClaveYT] = useState('');
+  const [verificandoClaveYT, setVerificandoClaveYT] = useState(false);
 
   // Spotify (Modo Multiusuario Activo para Todos + Reproducción Completa Simultánea)
   const [spotifyToken, setSpotifyToken] = useState(() => localStorage.getItem('spotify_token') || '');
@@ -196,8 +202,45 @@ export default function App() {
     setSpotifyPausadoMulti(true);
     setCurrentVideo(videoId);
     setYtIndex(index);
+    setYtPausado(false);
     setCurrentVideoNube(null);
     if (audioRef.current) audioRef.current.pause();
+  };
+
+  const togglePlayYouTube = () => {
+    if (!ytPlayerRef.current) return;
+    try {
+      if (ytPausado) {
+        ytPlayerRef.current.playVideo?.();
+        setYtPausado(false);
+      } else {
+        ytPlayerRef.current.pauseVideo?.();
+        setYtPausado(true);
+      }
+    } catch {}
+  };
+
+  const confirmarDesbloqueoYouTube = async () => {
+    if (!inputClaveYT.trim()) {
+      setErrorClaveYT('Por favor ingresa la contraseña o un pase temporal.');
+      return;
+    }
+    setVerificandoClaveYT(true);
+    setErrorClaveYT('');
+    try {
+      const r = await axios.post(`${API}/api/videos/desbloquear`, {
+        carpeta: 'TODAS',
+        clave: inputClaveYT.trim()
+      });
+      if (r.data?.ok) {
+        setYtPantallaBloqueada(false);
+        setModalDesbloquearYT(false);
+        setInputClaveYT('');
+      }
+    } catch (e) {
+      setErrorClaveYT(e.response?.data?.error || 'Contraseña incorrecta');
+    }
+    setVerificandoClaveYT(false);
   };
 
   const siguienteYouTube = () => {
@@ -400,7 +443,11 @@ export default function App() {
         },
         events: {
           onStateChange: event => {
-            if (event.data === 0) {
+            if (event.data === 1) {
+              setYtPausado(false);
+            } else if (event.data === 2) {
+              setYtPausado(true);
+            } else if (event.data === 0) {
               siguienteYouTube();
             }
           }
@@ -1296,7 +1343,7 @@ export default function App() {
         </section>
       )}
 
-      {/* PESTAÑA: YOUTUBE (DISEÑO IDÉNTICO A YOUTUBE: PANTALLA IZQUIERDA + LISTA DERECHA) */}
+      {/* PESTAÑA: YOUTUBE (DISEÑO IDÉNTICO A YOUTUBE + CORTINA ANTI-DISTRACCIÓN PROTEGIBLE CON CONTRASEÑA) */}
       {tab === 'youtube' && (() => {
         const videoActivoObj = ytVideos.find(v => v.id.videoId === currentVideo) || ytVideos[0];
         return (
@@ -1336,30 +1383,86 @@ export default function App() {
                   {ytBuscando ? '⏳' : '🔍'}
                 </button>
               </div>
+
+              {/* Botón de Modo Operativo: Desbloquear o volver a Tapar Pantalla */}
+              <div>
+                {ytPantallaBloqueada ? (
+                  <button
+                    className="btn-temp-pass"
+                    onClick={() => {
+                      setModalDesbloquearYT(true);
+                      setInputClaveYT('');
+                      setErrorClaveYT('');
+                    }}
+                    title="Desbloquear imagen del video con contraseña"
+                  >
+                    🔑 Desbloquear Video
+                  </button>
+                ) : (
+                  <button
+                    className="btn-lock-folders"
+                    onClick={() => setYtPantallaBloqueada(true)}
+                    title="Volver a tapar la pantalla de video para evitar distracciones"
+                  >
+                    🙈 Tapar Pantalla (Modo Operativo)
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="yt-watch-layout">
-              {/* Columna Izquierda: Pantalla principal y controles */}
+              {/* Columna Izquierda: Pantalla principal (con Cortina Anti-Distracción) y controles */}
               <div className="yt-watch-main">
                 {currentVideo ? (
                   <div className="yt-embed-container">
                     <div id="youtube-player-container" />
+
+                    {/* CORTINA ANTI-DISTRACCIÓN SOBRE LA PANTALLA DE VIDEO */}
+                    {ytPantallaBloqueada && (
+                      <div className="yt-nodistraction-curtain">
+                        <span className="yt-curtain-badge">🔒 MODO OPERATIVO • SOLO AUDIO ACTIVO</span>
+                        <div className="yt-curtain-icon">🎧</div>
+                        <h3 className="yt-curtain-title">¡No te distraigas! 🎶</h3>
+                        <p className="yt-curtain-desc">
+                          La música sigue sonando para acompañarte en tus actividades sin distracciones visuales.
+                          Puedes cambiar de canción o buscar más música en la lista de la derecha.
+                        </p>
+                        {videoActivoObj && (
+                          <div className="yt-curtain-nowplaying">
+                            {ytPausado ? '⏸ En pausa:' : '🎵 Sonando ahora:'}{' '}
+                            <strong>{videoActivoObj.snippet.title}</strong>
+                          </div>
+                        )}
+                        <div className="yt-curtain-actions">
+                          <button className="btn-primary" onClick={togglePlayYouTube}>
+                            {ytPausado ? '▶ Reanudar Música' : '⏸ Pausar Música'}
+                          </button>
+                          <button
+                            className="btn-control"
+                            onClick={() => {
+                              setModalDesbloquearYT(true);
+                              setInputClaveYT('');
+                              setErrorClaveYT('');
+                            }}
+                          >
+                            🔑 Desbloquear Video
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div
                     className="yt-embed-container yt-placeholder-screen"
                     onClick={() => ytVideos[0] && reproducirYouTube(ytVideos[0].id.videoId, 0)}
                   >
-                    {videoActivoObj && (
-                      <img
-                        src={videoActivoObj.snippet.thumbnails.default.url}
-                        alt={videoActivoObj.snippet.title}
-                        className="yt-placeholder-bg"
-                      />
-                    )}
-                    <div className="yt-placeholder-overlay">
-                      <div className="yt-big-play-btn">▶</div>
-                      <span>Haz clic para reproducir o elige un video de la lista derecha</span>
+                    <div className="yt-nodistraction-curtain" style={{ cursor: 'pointer' }}>
+                      <span className="yt-curtain-badge">🎧 MODO OPERATIVO • SIN DISTRACCIÓN</span>
+                      <div className="yt-big-play-btn" style={{ margin: '10px 0' }}>▶</div>
+                      <h3 className="yt-curtain-title">¡No te distraigas! Escucha tu música aquí</h3>
+                      <p className="yt-curtain-desc">
+                        Haz clic aquí o elige cualquier canción de las sugerencias a la derecha para empezar a escuchar.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -1376,7 +1479,9 @@ export default function App() {
                         <div className="yt-channel-title">
                           {videoActivoObj?.snippet?.channelTitle || 'YouTube Music'}
                         </div>
-                        <div className="yt-channel-sub">Canal oficial</div>
+                        <div className="yt-channel-sub">
+                          {ytPantallaBloqueada ? '🔒 Video cubierto (Solo Audio)' : '🔓 Video visible'}
+                        </div>
                       </div>
                     </div>
 
@@ -1384,6 +1489,11 @@ export default function App() {
                       <button className="btn-control" onClick={anteriorYouTube} disabled={!currentVideo}>
                         ⏮ Anterior
                       </button>
+                      {currentVideo && (
+                        <button className="btn-control" onClick={togglePlayYouTube}>
+                          {ytPausado ? '▶ Reproducir' : '⏸ Pausar'}
+                        </button>
+                      )}
                       <button className="btn-control" onClick={siguienteYouTube} disabled={!currentVideo}>
                         Siguiente Recomendada ⏭
                       </button>
@@ -1446,6 +1556,45 @@ export default function App() {
                 </div>
               </aside>
             </div>
+
+            {/* MODAL PARA DESBLOQUEAR LA PANTALLA DE VIDEO DE YOUTUBE CON CONTRASEÑA */}
+            {modalDesbloquearYT && (
+              <div className="security-modal-backdrop" onClick={() => setModalDesbloquearYT(false)}>
+                <div className="security-modal-card" onClick={e => e.stopPropagation()}>
+                  <div className="security-modal-header">
+                    <h3>🔓 Desbloquear Pantalla de YouTube</h3>
+                    <button className="modal-close-x" onClick={() => setModalDesbloquearYT(false)}>
+                      ✕
+                    </button>
+                  </div>
+                  <p className="security-modal-desc">
+                    Ingresa tu contraseña maestra o un código de pase temporal para quitar la cubierta y ver el video en pantalla.
+                  </p>
+                  <input
+                    type="password"
+                    className="security-pass-input"
+                    placeholder="Contraseña o Pase Temporal..."
+                    value={inputClaveYT}
+                    onChange={e => setInputClaveYT(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && confirmarDesbloqueoYouTube()}
+                    autoFocus
+                  />
+                  {errorClaveYT && <div className="security-error-msg">⚠️ {errorClaveYT}</div>}
+                  <div className="security-modal-footer">
+                    <button className="btn-control" onClick={() => setModalDesbloquearYT(false)}>
+                      Cancelar
+                    </button>
+                    <button
+                      className="btn-primary"
+                      onClick={confirmarDesbloqueoYouTube}
+                      disabled={verificandoClaveYT}
+                    >
+                      {verificandoClaveYT ? 'Verificando...' : '🔓 Mostrar Video'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         );
       })()}

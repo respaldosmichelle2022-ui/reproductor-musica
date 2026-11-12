@@ -1618,3 +1618,78 @@ body {
   background: #25d366;
   color: #000;
 }
+
+/* ============================================================
+   CORTINA ANTI-DISTRACCIÓN EN YOUTUBE (MODO OPERATIVO)
+============================================================ */
+.yt-nodistraction-curtain {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  background: radial-gradient(circle at center, #1d2b24 0%, #101412 100%);
+  border: 1px solid rgba(29, 185, 84, 0.35);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  box-sizing: border-box;
+  gap: 10px;
+  user-select: none;
+}
+
+.yt-curtain-badge {
+  background: rgba(29, 185, 84, 0.18);
+  border: 1px solid rgba(29, 185, 84, 0.45);
+  color: #6df09b;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 5px 14px;
+  border-radius: 20px;
+}
+
+.yt-curtain-icon {
+  font-size: 3.4rem;
+  line-height: 1;
+  margin: 4px 0;
+  filter: drop-shadow(0 4px 12px rgba(29, 185, 84, 0.35));
+}
+
+.yt-curtain-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.yt-curtain-desc {
+  margin: 0;
+  max-width: 520px;
+  font-size: 0.92rem;
+  color: #b8c7be;
+  line-height: 1.45;
+}
+
+.yt-curtain-nowplaying {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: #e2f5e9;
+  max-width: 90%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-curtain-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px;
+}
