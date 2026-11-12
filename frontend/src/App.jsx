@@ -470,6 +470,97 @@ export default function App() {
     } catch {}
   };
 
+  // Soporte MediaSession nativo para Android / iPhone (Controles en Pantalla de Bloqueo y Notificaciones)
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+
+    let titulo = 'Reproductor Multimedia';
+    let artista = 'Listo para reproducir';
+    let portada = '';
+
+    if (spotifyTrackActual) {
+      titulo = spotifyTrackActual.name;
+      artista = spotifyTrackActual.artists?.map(a => a.name).join(', ') || 'Spotify';
+      portada = spotifyTrackActual.album?.images?.[0]?.url || '';
+    } else if (current) {
+      titulo = nombre(current);
+      artista = 'Mi Música en la Nube';
+      portada = 'https://reproductor-musica-sigma.vercel.app/favicon.ico';
+    } else if (currentVideo) {
+      const v = ytVideos.find(x => x.id.videoId === currentVideo);
+      titulo = v?.snippet?.title || 'YouTube Music';
+      artista = v?.snippet?.channelTitle || 'YouTube';
+      portada = v?.snippet?.thumbnails?.default?.url || '';
+    } else if (currentVideoNube) {
+      titulo = currentVideoNube.titulo;
+      artista = `Mis Videos • ${currentVideoNube.carpeta}`;
+      portada = currentVideoNube.youtubeId
+        ? `https://img.youtube.com/vi/${currentVideoNube.youtubeId}/hqdefault.jpg`
+        : '';
+    }
+
+    try {
+      navigator.mediaSession.metadata = new window.MediaMetadata({
+        title: titulo,
+        artist: artista,
+        album: 'Reproductor Multimedia Cloud',
+        artwork: portada ? [{ src: portada, sizes: '512x512', type: 'image/jpeg' }] : []
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (spotifyTrackActual) togglePlaySpotifyMulti();
+        else if (current && audioRef.current) { audioRef.current.play(); setMp3Pausado(false); }
+        else if (currentVideo) togglePlayYouTube();
+        else if (currentVideoNube?.tipo === 'youtube') togglePlayNubeYT();
+      });
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (spotifyTrackActual) togglePlaySpotifyMulti();
+        else if (current && audioRef.current) { audioRef.current.pause(); setMp3Pausado(true); }
+        else if (currentVideo) togglePlayYouTube();
+        else if (currentVideoNube?.tipo === 'youtube') togglePlayNubeYT();
+      });
+
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        if (spotifyTrackActual) anteriorPistaSpotifyMulti();
+        else if (currentVideo) anteriorYouTube();
+        else moverAudio(-1);
+      });
+
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        if (spotifyTrackActual) siguientePistaSpotifyMulti();
+        else if (currentVideo) siguienteYouTube();
+        else moverAudio(1);
+      });
+    } catch {}
+  }, [
+    current,
+    mp3Pausado,
+    spotifyTrackActual,
+    spotifyPausadoMulti,
+    currentVideo,
+    ytPausado,
+    currentVideoNube,
+    nubeYtPausado,
+    ytVideos
+  ]);
+
+  // Mantener vivo el audio cuando la pestaña se minimiza o bloquea en móvil
+  useEffect(() => {
+    const alCambiarVisibilidad = () => {
+      if (document.visibilityState === 'hidden') {
+        if (currentVideo && !ytPausado && ytPlayerRef.current) {
+          try { ytPlayerRef.current.playVideo?.(); } catch {}
+        }
+        if (spotifyTrackActual && !spotifyPausadoMulti && spotifyBgPlayerRef.current) {
+          try { spotifyBgPlayerRef.current.playVideo?.(); } catch {}
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', alCambiarVisibilidad);
+    return () => document.removeEventListener('visibilitychange', alCambiarVisibilidad);
+  }, [currentVideo, ytPausado, spotifyTrackActual, spotifyPausadoMulti]);
+
   const confirmarDesbloqueoYouTube = async () => {
     if (!inputClaveYT.trim()) {
       setErrorClaveYT('Por favor ingresa la contraseña o un pase temporal.');
@@ -1444,6 +1535,40 @@ export default function App() {
       <main className="app-main-area">
         {/* 3. BUSCADOR ÚNICO SUPERIOR (Filtra o busca según la pestaña activa) */}
         <header className="top-search-header">
+          <div className="mobile-brand-bar">
+            <div className="mobile-brand-tag">
+              <span className="mobile-brand-icon">
+                <Music size={18} strokeWidth={2.4} />
+              </span>
+              <span className="mobile-brand-title">Reproductor</span>
+            </div>
+            {tab === 'youtube' && (
+              <span className="mobile-tab-pill youtube">
+                <Youtube size={12} strokeWidth={2.2} /> YouTube
+              </span>
+            )}
+            {tab === 'spotify' && (
+              <span className="mobile-tab-pill spotify">
+                <Disc3 size={12} strokeWidth={2.2} /> Spotify
+              </span>
+            )}
+            {tab === 'cloud' && (
+              <span className="mobile-tab-pill cloud">
+                <Cloud size={12} strokeWidth={2.2} /> Mi Música
+              </span>
+            )}
+            {tab === 'videos_nube' && (
+              <span className="mobile-tab-pill videos">
+                <Film size={12} strokeWidth={2.2} /> Mis Videos
+              </span>
+            )}
+            {tab === 'favorites' && (
+              <span className="mobile-tab-pill favorites">
+                <Heart size={12} strokeWidth={2.2} /> Favoritas
+              </span>
+            )}
+          </div>
+
           <div className="unified-search-box">
             <span className="unified-search-leading-icon">
               <Search size={17} strokeWidth={2} />
@@ -2949,6 +3074,13 @@ export default function App() {
 
         return (
           <footer className="bottom-player-bar">
+            {/* Barra mini de progreso superior en móvil */}
+            <div
+              className="bottom-player-mini-progress"
+              style={{
+                width: `${durSeg > 0 ? Math.min(100, Math.max(0, (posSeg / durSeg) * 100)) : 0}%`
+              }}
+            />
             {/* Izquierda: Canción / Video Actual */}
             <div className="bottom-player-left">
               {miniaturaBarra ? (

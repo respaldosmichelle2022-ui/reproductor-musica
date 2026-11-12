@@ -2496,51 +2496,408 @@ body.video-cursor-none *,
   background: #0e0e0e;
 }
 
-/* Adaptación Responsiva para Celulares y Pantallas Pequeñas */
-@media (max-width: 820px) {
+/* Elementos de la barra superior en móvil */
+.mobile-brand-bar {
+  display: none;
+}
+
+.bottom-player-mini-progress {
+  display: none;
+}
+
+/* ============================================================
+   ADAPTACIÓN RESPONSIVA PROFESIONAL PARA TELÉFONOS MÓVILES (<= 768px)
+   (Diseño 100% nativo tipo App móvil: Barra inferior de navegación + Mini reproductor flotante)
+============================================================ */
+@media (max-width: 768px) {
   .app-layout {
     flex-direction: column;
+    min-height: 100vh;
+    overflow-x: hidden;
   }
 
+  /* 1. La barra lateral de escritorio se convierte en Barra de Navegación Inferior Móvil Fija */
   .app-sidebar {
-    position: static;
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
     width: 100%;
+    height: 56px;
+    background: rgba(12, 12, 14, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     border-right: none;
-    border-bottom: 1px solid #222;
-    padding: 12px 14px;
+    padding: 0 4px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    z-index: 500;
+    box-sizing: border-box;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.4);
   }
 
   .sidebar-brand {
-    padding-bottom: 10px;
-    margin-bottom: 10px;
+    display: none;
   }
 
   .sidebar-nav {
+    display: flex;
     flex-direction: row;
-    overflow-x: auto;
-    gap: 6px;
-    padding-bottom: 4px;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
   }
 
   .sidebar-tab-btn {
-    width: auto;
-    padding: 8px 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 2px;
+    border-radius: 8px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #8a8a8a;
+    border: none;
+    background: transparent;
+    text-align: center;
+    min-width: 0;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .sidebar-tab-btn:hover {
+    background: transparent;
+    color: #bbb;
+  }
+
+  .sidebar-tab-btn.active {
+    color: #1ed760;
+    background: rgba(29, 185, 84, 0.12);
+  }
+
+  .sidebar-tab-icon {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sidebar-tab-label {
+    font-size: 0.65rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .sidebar-tab-count {
+    display: none;
+  }
+
+  /* 2. Mini Reproductor Flotante Móvil (justo encima de la barra de navegación) */
+  .bottom-player-bar {
+    position: fixed;
+    bottom: 56px;
+    left: 0;
+    right: 0;
+    height: 54px;
+    background: rgba(18, 18, 20, 0.96);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    gap: 8px;
+    grid-template-columns: none;
+    z-index: 450;
+    box-sizing: border-box;
+  }
+
+  .bottom-player-mini-progress {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 2.5px;
+    background: #1db954;
+    z-index: 10;
+    transition: width 0.3s linear;
+  }
+
+  .bottom-player-left {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .bottom-player-thumb,
+  .bottom-player-icon-box {
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
     flex-shrink: 0;
   }
 
-  .app-main-area {
-    margin-left: 0;
-    padding: 14px 14px 140px;
+  .bottom-player-meta {
+    flex: 1;
+    min-width: 0;
   }
 
-  .bottom-player-bar {
-    height: auto;
-    padding: 10px 14px;
-    grid-template-columns: 1fr;
-    gap: 8px;
+  .bottom-player-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bottom-player-sub {
+    font-size: 0.70rem;
+    color: #8a8a8a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bottom-player-center {
+    width: auto;
+    max-width: none;
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .bottom-progress-row {
+    display: none;
+  }
+
+  .bottom-player-buttons {
+    gap: 6px;
+  }
+
+  .bottom-ctrl-btn.small {
+    display: none;
+  }
+
+  .bottom-ctrl-btn {
+    padding: 4px;
+    color: #d0d0d0;
+  }
+
+  .bottom-play-main-btn {
+    width: 34px;
+    height: 34px;
+    background: #1db954;
+    color: #000;
   }
 
   .bottom-player-right {
     display: none;
+  }
+
+  /* 3. Área de contenido principal en móvil */
+  .app-main-area {
+    margin-left: 0;
+    padding: 10px 12px 130px;
+    box-sizing: border-box;
+  }
+
+  /* 4. Encabezado superior compacto en móvil */
+  .top-search-header {
+    padding: 6px 0 10px;
+    margin-bottom: 12px;
+  }
+
+  .mobile-brand-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding: 0 2px;
+  }
+
+  .mobile-brand-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .mobile-brand-icon {
+    color: #1db954;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .mobile-brand-title {
+    font-size: 0.94rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.3px;
+  }
+
+  .mobile-tab-pill {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .mobile-tab-pill.youtube {
+    background: rgba(255, 0, 0, 0.14);
+    border-color: rgba(255, 0, 0, 0.35);
+    color: #ff6b6b;
+  }
+
+  .mobile-tab-pill.spotify {
+    background: rgba(29, 185, 84, 0.14);
+    border-color: rgba(29, 185, 84, 0.35);
+    color: #1ed760;
+  }
+
+  .unified-search-box input {
+    height: 38px;
+    padding: 8px 36px 8px 38px;
+    font-size: 0.88rem;
+  }
+
+  .unified-search-btn {
+    height: 38px;
+    padding: 0 12px;
+    font-size: 0.82rem;
+  }
+
+  /* 5. Pestaña YouTube en móvil */
+  .yt-watch-layout {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .yt-top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .yt-controls-bar {
+    gap: 6px;
+    justify-content: flex-start;
+  }
+
+  .yt-controls-bar .btn-control,
+  .yt-quality-control,
+  .btn-mode-toggle {
+    font-size: 0.76rem;
+    padding: 6px 9px;
+  }
+
+  .yt-sidebar-card {
+    padding: 8px;
+    gap: 10px;
+  }
+
+  .yt-sidebar-thumb {
+    width: 90px;
+    height: 50px;
+    flex-shrink: 0;
+  }
+
+  .yt-sidebar-info h4 {
+    font-size: 0.82rem;
+    -webkit-line-clamp: 2;
+  }
+
+  /* 6. Pestaña Mis Videos en móvil (Carpetas organizadas en 2 columnas parejas) */
+  .locked-folders-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .locked-folder-card {
+    padding: 14px;
+    gap: 10px;
+    border-radius: 12px;
+  }
+
+  .locked-folder-emoji {
+    font-size: 1.8rem;
+  }
+
+  .locked-folder-info h3 {
+    font-size: 0.92rem;
+  }
+
+  .btn-open-folder {
+    padding: 8px 10px;
+    font-size: 0.76rem;
+  }
+
+  .video-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  /* 7. Pestaña Spotify en móvil (Portadas en 2 columnas elegantes) */
+  .spotify-top-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .spotify-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .spotify-card {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .spotify-card h3 {
+    font-size: 0.84rem;
+  }
+
+  .spotify-card p {
+    font-size: 0.72rem;
+  }
+
+  .spotify-nav-pills {
+    gap: 6px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+  }
+
+  .pill-btn {
+    font-size: 0.78rem;
+    padding: 6px 12px;
+    flex-shrink: 0;
+  }
+
+  /* 8. Modales en móvil */
+  .security-modal-card {
+    max-width: 92%;
+    padding: 18px;
   }
 }
