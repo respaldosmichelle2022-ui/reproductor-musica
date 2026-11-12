@@ -1818,26 +1818,30 @@ body {
 /* ============================================================
    ESCUDOS ANTI-REDIRECCIÓN A YOUTUBE + OCULTADOR DE FLECHA DEL MOUSE
 ============================================================ */
-/* Bloquea clic en el título superior / avatar / compartir dentro del iframe */
+/* Bloquea clic en el título superior / avatar / compartir incluso en Pantalla Completa */
 .yt-shield-top {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 58px;
+  height: 38%;
+  min-height: 135px;
+  max-height: 210px;
   z-index: 20;
   background: transparent;
+  cursor: default;
 }
 
-/* Bloquea el botón "Mirar en YouTube" en la esquina inferior izquierda al pausar */
+/* Bloquea la zona central-izquierda y el botón "Mirar en YouTube" al pausar, dejando libre el menú ⚙️ de Calidad a la derecha */
 .yt-shield-watch-link {
   position: absolute;
-  bottom: 50px;
+  top: 38%;
+  bottom: 52px;
   left: 0;
-  width: 185px;
-  height: 48px;
+  right: 260px;
   z-index: 20;
   background: transparent;
+  cursor: default;
 }
 
 /* Tapa el logo "▶ YouTube" en la esquina inferior derecha dejando libre el engrane ⚙️ de Calidad */
@@ -1845,7 +1849,7 @@ body {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 112px;
+  width: 96px;
   height: 46px;
   z-index: 21;
   background: #0b0b0b;
@@ -1853,7 +1857,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 12px;
+  padding-right: 10px;
   box-sizing: border-box;
 }
 
@@ -1877,24 +1881,45 @@ body {
   transform: scale(1.06);
 }
 
-/* Contenedor de video nativo MP4 y ocultador automático del cursor tras 2.5s */
+/* Contenedor de video nativo MP4 y ocultador automático del cursor tras 2.2s */
 .native-video-wrap {
   position: relative;
   width: 100%;
   background: #000;
 }
 
+.native-video-wrap:fullscreen,
+.native-video-wrap:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+}
+
+body.video-cursor-none,
+body.video-cursor-none *,
 .yt-embed-container.cursor-hidden,
+.yt-embed-container.cursor-hidden *,
 .native-video-wrap.cursor-hidden,
-.video-idle-cursor-hider {
+.native-video-wrap.cursor-hidden * {
+  cursor: none !important;
+}
+
+/* Al ocultar el puntero, desactivar pointer-events del iframe para que Chrome oculte la flecha al instante */
+.yt-embed-container.cursor-hidden iframe,
+.native-video-wrap.cursor-hidden video {
+  pointer-events: none !important;
   cursor: none !important;
 }
 
 .video-idle-cursor-hider {
   position: absolute;
   inset: 0;
-  z-index: 24;
+  z-index: 28;
   background: transparent;
+  pointer-events: none;
+}
+
+.video-idle-cursor-hider.active {
+  pointer-events: auto !important;
   cursor: none !important;
 }
 

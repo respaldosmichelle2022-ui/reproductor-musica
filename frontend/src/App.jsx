@@ -173,19 +173,73 @@ export default function App() {
   const [cursorVideoOculto, setCursorVideoOculto] = useState(false);
   const [calidadYT, setCalidadYT] = useState('hd1080');
 
-  // Auto-ocultar la flecha del mouse después de 2.5s sin movimiento sobre el video
+  // Auto-ocultar la flecha del mouse después de 2.2s sin movimiento sobre el video
   const registrarMovimientoMouseVideo = () => {
     setCursorVideoOculto(false);
     if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
     cursorTimerRef.current = setTimeout(() => {
       setCursorVideoOculto(true);
-    }, 2500);
+    }, 2200);
   };
 
   const salirMouseVideo = () => {
     if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
     setCursorVideoOculto(false);
   };
+
+  // Mantener vigilancia global del puntero y asegurar que Pantalla Completa siempre incluya los escudos
+  useEffect(() => {
+    const videoVisibleActivo =
+      (tab === 'youtube' && Boolean(currentVideo) && !ytPantallaBloqueada) ||
+      (tab === 'videos_nube' && Boolean(currentVideoNube));
+
+    if (!videoVisibleActivo) {
+      if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
+      setCursorVideoOculto(false);
+      document.body.classList.remove('video-cursor-none');
+      return;
+    }
+
+    registrarMovimientoMouseVideo();
+
+    const alMoverMouse = () => {
+      registrarMovimientoMouseVideo();
+    };
+
+    const alCambiarFullscreen = () => {
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      // Si por doble clic el navegador puso el iframe crudo en pantalla completa, pasar al contenedor con escudos
+      if (fsEl && fsEl.tagName === 'IFRAME' && fsEl.parentElement) {
+        const contenedor = fsEl.parentElement;
+        if (document.exitFullscreen) {
+          document.exitFullscreen().then(() => {
+            contenedor.requestFullscreen?.().catch(() => {});
+          }).catch(() => {});
+        }
+      }
+      registrarMovimientoMouseVideo();
+    };
+
+    window.addEventListener('mousemove', alMoverMouse, { passive: true });
+    window.addEventListener('mousedown', alMoverMouse, { passive: true });
+    window.addEventListener('keydown', alMoverMouse, { passive: true });
+    document.addEventListener('fullscreenchange', alCambiarFullscreen);
+    document.addEventListener('webkitfullscreenchange', alCambiarFullscreen);
+
+    return () => {
+      if (cursorTimerRef.current) clearTimeout(cursorTimerRef.current);
+      window.removeEventListener('mousemove', alMoverMouse);
+      window.removeEventListener('mousedown', alMoverMouse);
+      window.removeEventListener('keydown', alMoverMouse);
+      document.removeEventListener('fullscreenchange', alCambiarFullscreen);
+      document.removeEventListener('webkitfullscreenchange', alCambiarFullscreen);
+      document.body.classList.remove('video-cursor-none');
+    };
+  }, [tab, currentVideo, ytPantallaBloqueada, currentVideoNube]);
+
+  useEffect(() => {
+    document.body.classList.toggle('video-cursor-none', cursorVideoOculto);
+  }, [cursorVideoOculto]);
 
   const alternarPantallaCompletaElemento = elemento => {
     if (!elemento) return;
@@ -579,6 +633,7 @@ export default function App() {
         playerVars: {
           autoplay: 1,
           controls: 1,
+          fs: 0,
           rel: 0,
           modestbranding: 1,
           iv_load_policy: 3,
@@ -1475,22 +1530,23 @@ export default function App() {
                       onMouseLeave={salirMouseVideo}
                     >
                       <iframe
-                        src={`https://www.youtube.com/embed/${currentVideoNube.youtubeId}?autoplay=1&controls=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1`}
+                        src={`https://www.youtube.com/embed/${currentVideoNube.youtubeId}?autoplay=1&controls=1&fs=0&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1`}
                         title={currentVideoNube.titulo}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                        allowFullScreen
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         className="yt-iframe-element"
                       />
-                      {/* Escudo superior: bloquea clic en el título/canal para que no abra YouTube en otra pestaña */}
+                      {/* Escudo superior amplio: bloquea título, canal y compartir incluso en Pantalla Completa */}
                       <div
                         className="yt-shield-top"
                         onMouseMove={registrarMovimientoMouseVideo}
+                        onDoubleClick={pantallaCompletaVideo}
                         title={currentVideoNube.titulo}
                       />
-                      {/* Escudo inferior izquierdo: bloquea el botón 'Mirar en YouTube' al pausar */}
+                      {/* Escudo central-izquierdo: bloquea 'Mirar en YouTube' y tarjetas sugeridas */}
                       <div
                         className="yt-shield-watch-link"
                         onMouseMove={registrarMovimientoMouseVideo}
+                        onDoubleClick={pantallaCompletaVideo}
                       />
                       {/* Escudo inferior derecho: tapa el logo de YouTube (dejando libre el engrane ⚙️ de Calidad) */}
                       <div
@@ -1506,14 +1562,12 @@ export default function App() {
                           <Maximize2 size={15} strokeWidth={2.2} />
                         </button>
                       </div>
-                      {/* Capa que oculta la flecha del mouse tras 2.5s sin moverlo */}
-                      {cursorVideoOculto && (
-                        <div
-                          className="video-idle-cursor-hider"
-                          onMouseMove={registrarMovimientoMouseVideo}
-                          onMouseDown={registrarMovimientoMouseVideo}
-                        />
-                      )}
+                      {/* Capa que oculta la flecha del mouse tras 2.2s sin moverlo */}
+                      <div
+                        className={`video-idle-cursor-hider ${cursorVideoOculto ? 'active' : ''}`}
+                        onMouseMove={registrarMovimientoMouseVideo}
+                        onMouseDown={registrarMovimientoMouseVideo}
+                      />
                     </div>
                   ) : (
                     <div
@@ -1532,13 +1586,11 @@ export default function App() {
                         className="cloud-video-element"
                         src={currentVideoNube.url}
                       />
-                      {cursorVideoOculto && (
-                        <div
-                          className="video-idle-cursor-hider"
-                          onMouseMove={registrarMovimientoMouseVideo}
-                          onMouseDown={registrarMovimientoMouseVideo}
-                        />
-                      )}
+                      <div
+                        className={`video-idle-cursor-hider ${cursorVideoOculto ? 'active' : ''}`}
+                        onMouseMove={registrarMovimientoMouseVideo}
+                        onMouseDown={registrarMovimientoMouseVideo}
+                      />
                     </div>
                   )}
                 </div>
@@ -1811,18 +1863,20 @@ export default function App() {
 
                     {!ytPantallaBloqueada && (
                       <>
-                        {/* Escudo superior: bloquea clic en el título/canal para no abrir el video en otra pestaña */}
+                        {/* Escudo superior amplio: bloquea clic en título y canal incluso en Pantalla Completa */}
                         <div
                           className="yt-shield-top"
                           onMouseMove={registrarMovimientoMouseVideo}
                           onClick={togglePlayYouTube}
-                          title="Clic para pausar o reproducir"
+                          onDoubleClick={() => alternarPantallaCompletaElemento(ytEmbedWrapRef.current)}
+                          title="Clic para pausar/reproducir • Doble clic para Pantalla Completa"
                         />
-                        {/* Escudo inferior izquierdo: bloquea el enlace 'Mirar en YouTube' cuando está en pausa */}
+                        {/* Escudo central-izquierdo: bloquea 'Mirar en YouTube' y tarjetas sugeridas al pausar */}
                         <div
                           className="yt-shield-watch-link"
                           onMouseMove={registrarMovimientoMouseVideo}
                           onClick={togglePlayYouTube}
+                          onDoubleClick={() => alternarPantallaCompletaElemento(ytEmbedWrapRef.current)}
                         />
                         {/* Escudo inferior derecho: tapa el logo de YouTube dejando libre el engrane ⚙️ de Calidad */}
                         <div
@@ -1850,14 +1904,12 @@ export default function App() {
                           <span>Mostrar/Ocultar Video</span>
                         </button>
 
-                        {/* Capa que oculta la flecha del mouse tras 2.5s sin moverlo */}
-                        {cursorVideoOculto && (
-                          <div
-                            className="video-idle-cursor-hider"
-                            onMouseMove={registrarMovimientoMouseVideo}
-                            onMouseDown={registrarMovimientoMouseVideo}
-                          />
-                        )}
+                        {/* Capa permanente que oculta la flecha del mouse tras 2.2s sin moverlo */}
+                        <div
+                          className={`video-idle-cursor-hider ${cursorVideoOculto ? 'active' : ''}`}
+                          onMouseMove={registrarMovimientoMouseVideo}
+                          onMouseDown={registrarMovimientoMouseVideo}
+                        />
                       </>
                     )}
 
