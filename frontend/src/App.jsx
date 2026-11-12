@@ -174,6 +174,7 @@ export default function App() {
   const ultimaPosMouseRef = useRef({ x: -1, y: -1 });
   const silentAudioRef = useRef(null);
   const usuarioDioPausaManualRef = useRef(false);
+  const fuePausadoPorSegundoPlanoRef = useRef(false);
   const [cursorVideoOculto, setCursorVideoOculto] = useState(false);
   const [calidadYT, setCalidadYT] = useState('hd1080');
   const [nubeYtPausado, setNubeYtPausado] = useState(false);
@@ -188,7 +189,7 @@ export default function App() {
         if (!silentAudioRef.current.src || !silentAudioRef.current.src.startsWith('data:audio/wav')) {
           silentAudioRef.current.src = SILENT_AUDIO_WAV;
           silentAudioRef.current.loop = true;
-          silentAudioRef.current.volume = 0.001;
+          silentAudioRef.current.volume = 0.01;
         }
         silentAudioRef.current.play().catch(() => {});
       }
@@ -413,6 +414,7 @@ export default function App() {
 
   const reproducirMP3 = url => {
     usuarioDioPausaManualRef.current = false;
+    fuePausadoPorSegundoPlanoRef.current = false;
     desactivarAudioKeepAlive();
     try { spotifyPlayerRef.current?.pause(); } catch {}
     try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
@@ -428,6 +430,7 @@ export default function App() {
 
   const reproducirVideoNube = video => {
     usuarioDioPausaManualRef.current = false;
+    fuePausadoPorSegundoPlanoRef.current = false;
     try { spotifyPlayerRef.current?.pause(); } catch {}
     try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
     try { ytPlayerRef.current?.pauseVideo?.(); } catch {}
@@ -462,6 +465,7 @@ export default function App() {
 
   const reproducirYouTube = (videoId, index = 0) => {
     usuarioDioPausaManualRef.current = false;
+    fuePausadoPorSegundoPlanoRef.current = false;
     activarAudioKeepAlive();
     try { spotifyPlayerRef.current?.pause(); } catch {}
     try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
@@ -482,14 +486,18 @@ export default function App() {
     try {
       if (ytPausado) {
         usuarioDioPausaManualRef.current = false;
+        fuePausadoPorSegundoPlanoRef.current = false;
         ytPlayerRef.current.playVideo?.();
         setYtPausado(false);
         activarAudioKeepAlive();
+        try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; } catch {}
       } else {
         usuarioDioPausaManualRef.current = true;
+        fuePausadoPorSegundoPlanoRef.current = false;
         ytPlayerRef.current.pauseVideo?.();
         setYtPausado(true);
         desactivarAudioKeepAlive();
+        try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; } catch {}
       }
     } catch {}
   };
@@ -499,14 +507,18 @@ export default function App() {
     try {
       if (nubeYtPausado) {
         usuarioDioPausaManualRef.current = false;
+        fuePausadoPorSegundoPlanoRef.current = false;
         nubeYtPlayerRef.current.playVideo?.();
         setNubeYtPausado(false);
         activarAudioKeepAlive();
+        try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; } catch {}
       } else {
         usuarioDioPausaManualRef.current = true;
+        fuePausadoPorSegundoPlanoRef.current = false;
         nubeYtPlayerRef.current.pauseVideo?.();
         setNubeYtPausado(true);
         desactivarAudioKeepAlive();
+        try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; } catch {}
       }
     } catch {}
   };
@@ -518,26 +530,31 @@ export default function App() {
     let titulo = 'Reproductor Multimedia';
     let artista = 'Listo para reproducir';
     let portada = '';
+    let estaPausado = true;
 
     if (spotifyTrackActual) {
       titulo = spotifyTrackActual.name;
       artista = spotifyTrackActual.artists?.map(a => a.name).join(', ') || 'Spotify';
       portada = spotifyTrackActual.album?.images?.[0]?.url || '';
+      estaPausado = spotifyPausadoMulti;
     } else if (current) {
       titulo = nombre(current);
       artista = 'Mi Música en la Nube';
       portada = 'https://reproductor-musica-sigma.vercel.app/favicon.ico';
+      estaPausado = mp3Pausado;
     } else if (currentVideo) {
       const v = ytVideos.find(x => x.id.videoId === currentVideo);
       titulo = v?.snippet?.title || 'YouTube Music';
       artista = v?.snippet?.channelTitle || 'YouTube';
       portada = v?.snippet?.thumbnails?.default?.url || '';
+      estaPausado = ytPausado;
     } else if (currentVideoNube) {
       titulo = currentVideoNube.titulo;
       artista = `Mis Videos • ${currentVideoNube.carpeta}`;
       portada = currentVideoNube.youtubeId
         ? `https://img.youtube.com/vi/${currentVideoNube.youtubeId}/hqdefault.jpg`
         : '';
+      estaPausado = currentVideoNube.tipo === 'youtube' ? nubeYtPausado : false;
     }
 
     try {
@@ -548,18 +565,68 @@ export default function App() {
         artwork: portada ? [{ src: portada, sizes: '512x512', type: 'image/jpeg' }] : []
       });
 
+      navigator.mediaSession.playbackState = estaPausado ? 'paused' : 'playing';
+
+      // Al pulsar PLAY en pantalla de bloqueo o auriculares bluetooth:
       navigator.mediaSession.setActionHandler('play', () => {
-        if (spotifyTrackActual) togglePlaySpotifyMulti();
-        else if (current && audioRef.current) { audioRef.current.play(); setMp3Pausado(false); }
-        else if (currentVideo) togglePlayYouTube();
-        else if (currentVideoNube?.tipo === 'youtube') togglePlayNubeYT();
+        usuarioDioPausaManualRef.current = false;
+        fuePausadoPorSegundoPlanoRef.current = false;
+        if (spotifyTrackActual) {
+          try {
+            spotifyBgPlayerRef.current?.playVideo?.();
+            setSpotifyPausadoMulti(false);
+            activarAudioKeepAlive();
+          } catch {}
+        } else if (current && audioRef.current) {
+          try {
+            audioRef.current.play();
+            setMp3Pausado(false);
+          } catch {}
+        } else if (currentVideo) {
+          try {
+            ytPlayerRef.current?.playVideo?.();
+            setYtPausado(false);
+            activarAudioKeepAlive();
+          } catch {}
+        } else if (currentVideoNube?.tipo === 'youtube') {
+          try {
+            nubeYtPlayerRef.current?.playVideo?.();
+            setNubeYtPausado(false);
+            activarAudioKeepAlive();
+          } catch {}
+        }
+        try { navigator.mediaSession.playbackState = 'playing'; } catch {}
       });
 
+      // Al pulsar PAUSA en pantalla de bloqueo o auriculares bluetooth:
       navigator.mediaSession.setActionHandler('pause', () => {
-        if (spotifyTrackActual) togglePlaySpotifyMulti();
-        else if (current && audioRef.current) { audioRef.current.pause(); setMp3Pausado(true); }
-        else if (currentVideo) togglePlayYouTube();
-        else if (currentVideoNube?.tipo === 'youtube') togglePlayNubeYT();
+        usuarioDioPausaManualRef.current = true;
+        fuePausadoPorSegundoPlanoRef.current = false;
+        if (spotifyTrackActual) {
+          try {
+            spotifyBgPlayerRef.current?.pauseVideo?.();
+            setSpotifyPausadoMulti(true);
+            desactivarAudioKeepAlive();
+          } catch {}
+        } else if (current && audioRef.current) {
+          try {
+            audioRef.current.pause();
+            setMp3Pausado(true);
+          } catch {}
+        } else if (currentVideo) {
+          try {
+            ytPlayerRef.current?.pauseVideo?.();
+            setYtPausado(true);
+            desactivarAudioKeepAlive();
+          } catch {}
+        } else if (currentVideoNube?.tipo === 'youtube') {
+          try {
+            nubeYtPlayerRef.current?.pauseVideo?.();
+            setNubeYtPausado(true);
+            desactivarAudioKeepAlive();
+          } catch {}
+        }
+        try { navigator.mediaSession.playbackState = 'paused'; } catch {}
       });
 
       navigator.mediaSession.setActionHandler('previoustrack', () => {
@@ -586,45 +653,55 @@ export default function App() {
     ytVideos
   ]);
 
-  // Mantener vivo el audio cuando la pantalla se apaga o la pestaña se minimiza en móvil
+  // Auto-reanudación inteligente al volver a la app o desbloquear en móvil
   useEffect(() => {
     const alCambiarVisibilidad = () => {
-      if (document.visibilityState === 'hidden') {
-        if (!usuarioDioPausaManualRef.current) {
+      if (document.visibilityState === 'visible') {
+        // Al regresar a la pestaña o app, si se había pausado por minimizar:
+        if (fuePausadoPorSegundoPlanoRef.current && !usuarioDioPausaManualRef.current) {
+          fuePausadoPorSegundoPlanoRef.current = false;
+          if (spotifyTrackActual && spotifyBgPlayerRef.current) {
+            try {
+              spotifyBgPlayerRef.current.playVideo?.();
+              setSpotifyPausadoMulti(false);
+              activarAudioKeepAlive();
+            } catch {}
+          } else if (currentVideo && ytPlayerRef.current) {
+            try {
+              ytPlayerRef.current.playVideo?.();
+              setYtPausado(false);
+              activarAudioKeepAlive();
+            } catch {}
+          } else if (currentVideoNube?.tipo === 'youtube' && nubeYtPlayerRef.current) {
+            try {
+              nubeYtPlayerRef.current.playVideo?.();
+              setNubeYtPausado(false);
+              activarAudioKeepAlive();
+            } catch {}
+          }
+        }
+      } else if (document.visibilityState === 'hidden') {
+        // Al minimizar o apagar pantalla, registrar si estaba reproduciendo
+        const estabaSonando =
+          (spotifyTrackActual && !spotifyPausadoMulti) ||
+          (currentVideo && !ytPausado) ||
+          (currentVideoNube?.tipo === 'youtube' && !nubeYtPausado);
+        if (estabaSonando && !usuarioDioPausaManualRef.current) {
+          fuePausadoPorSegundoPlanoRef.current = true;
           activarAudioKeepAlive();
-          if (currentVideo && !ytPausado && ytPlayerRef.current) {
-            [40, 120, 250, 500, 900].forEach(ms => {
-              setTimeout(() => {
-                if (!usuarioDioPausaManualRef.current) {
-                  try { ytPlayerRef.current?.playVideo?.(); } catch {}
-                }
-              }, ms);
-            });
-          }
-          if (spotifyTrackActual && !spotifyPausadoMulti && spotifyBgPlayerRef.current) {
-            [40, 120, 250, 500, 900].forEach(ms => {
-              setTimeout(() => {
-                if (!usuarioDioPausaManualRef.current) {
-                  try { spotifyBgPlayerRef.current?.playVideo?.(); } catch {}
-                }
-              }, ms);
-            });
-          }
-          if (currentVideoNube?.tipo === 'youtube' && !nubeYtPausado && nubeYtPlayerRef.current) {
-            [40, 120, 250, 500, 900].forEach(ms => {
-              setTimeout(() => {
-                if (!usuarioDioPausaManualRef.current) {
-                  try { nubeYtPlayerRef.current?.playVideo?.(); } catch {}
-                }
-              }, ms);
-            });
-          }
         }
       }
     };
     document.addEventListener('visibilitychange', alCambiarVisibilidad);
     return () => document.removeEventListener('visibilitychange', alCambiarVisibilidad);
-  }, [currentVideo, ytPausado, spotifyTrackActual, spotifyPausadoMulti, currentVideoNube, nubeYtPausado]);
+  }, [
+    currentVideo,
+    ytPausado,
+    spotifyTrackActual,
+    spotifyPausadoMulti,
+    currentVideoNube,
+    nubeYtPausado
+  ]);
 
   const confirmarDesbloqueoYouTube = async () => {
     if (!inputClaveYT.trim()) {
@@ -905,9 +982,11 @@ export default function App() {
           onStateChange: event => {
             if (event.data === 1) {
               usuarioDioPausaManualRef.current = false;
+              fuePausadoPorSegundoPlanoRef.current = false;
               setYtPausado(false);
               activarAudioKeepAlive();
               try {
+                if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
                 const d = event.target.getDuration?.();
                 if (d && d > 0) setYtDuracionSeg(Math.floor(d));
                 if (calidadYT && calidadYT !== 'default') {
@@ -916,20 +995,14 @@ export default function App() {
                 }
               } catch {}
             } else if (event.data === 2) {
-              // Si la pantalla se bloqueó o la pestaña se minimizó y NO fue pausa del usuario:
               if (document.hidden && !usuarioDioPausaManualRef.current) {
-                activarAudioKeepAlive();
-                [40, 120, 250, 500, 900].forEach(ms => {
-                  setTimeout(() => {
-                    if (!usuarioDioPausaManualRef.current) {
-                      try { event.target.playVideo?.(); } catch {}
-                    }
-                  }, ms);
-                });
-                return;
+                fuePausadoPorSegundoPlanoRef.current = true;
               }
               setYtPausado(true);
               desactivarAudioKeepAlive();
+              try {
+                if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+              } catch {}
             } else if (event.data === 0) {
               siguienteYouTube();
             }
@@ -1009,9 +1082,11 @@ export default function App() {
           onStateChange: event => {
             if (event.data === 1) {
               usuarioDioPausaManualRef.current = false;
+              fuePausadoPorSegundoPlanoRef.current = false;
               setNubeYtPausado(false);
               activarAudioKeepAlive();
               try {
+                if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
                 const d = event.target.getDuration?.();
                 if (d && d > 0) setNubeYtDuracionSeg(Math.floor(d));
                 if (calidadYT && calidadYT !== 'default') {
@@ -1021,18 +1096,13 @@ export default function App() {
               } catch {}
             } else if (event.data === 2) {
               if (document.hidden && !usuarioDioPausaManualRef.current) {
-                activarAudioKeepAlive();
-                [40, 120, 250, 500, 900].forEach(ms => {
-                  setTimeout(() => {
-                    if (!usuarioDioPausaManualRef.current) {
-                      try { event.target.playVideo?.(); } catch {}
-                    }
-                  }, ms);
-                });
-                return;
+                fuePausadoPorSegundoPlanoRef.current = true;
               }
               setNubeYtPausado(true);
               desactivarAudioKeepAlive();
+              try {
+                if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+              } catch {}
             } else if (event.data === 0) {
               setNubeYtPausado(true);
             }
@@ -1253,27 +1323,24 @@ export default function App() {
             onStateChange: ev => {
               if (ev.data === 1) {
                 usuarioDioPausaManualRef.current = false;
+                fuePausadoPorSegundoPlanoRef.current = false;
                 setSpotifyCargandoAudio(false);
                 setSpotifyPausadoMulti(false);
                 activarAudioKeepAlive();
                 try {
+                  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
                   const durSec = ev.target.getDuration?.();
                   if (durSec && durSec > 0) setSpotifyDuracionMs(Math.floor(durSec * 1000));
                 } catch {}
               } else if (ev.data === 2) {
                 if (document.hidden && !usuarioDioPausaManualRef.current) {
-                  activarAudioKeepAlive();
-                  [40, 120, 250, 500, 900].forEach(ms => {
-                    setTimeout(() => {
-                      if (!usuarioDioPausaManualRef.current) {
-                        try { ev.target.playVideo?.(); } catch {}
-                      }
-                    }, ms);
-                  });
-                  return;
+                  fuePausadoPorSegundoPlanoRef.current = true;
                 }
                 setSpotifyPausadoMulti(true);
                 desactivarAudioKeepAlive();
+                try {
+                  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+                } catch {}
               } else if (ev.data === 0) {
                 // Avanzar automáticamente a la siguiente canción de la cola
                 const c = spotifyColaRef.current || [];
@@ -1298,14 +1365,18 @@ export default function App() {
     try {
       if (spotifyPausadoMulti) {
         usuarioDioPausaManualRef.current = false;
+        fuePausadoPorSegundoPlanoRef.current = false;
         spotifyBgPlayerRef.current.playVideo?.();
         setSpotifyPausadoMulti(false);
         activarAudioKeepAlive();
+        try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; } catch {}
       } else {
         usuarioDioPausaManualRef.current = true;
+        fuePausadoPorSegundoPlanoRef.current = false;
         spotifyBgPlayerRef.current.pauseVideo?.();
         setSpotifyPausadoMulti(true);
         desactivarAudioKeepAlive();
+        try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; } catch {}
       }
     } catch {}
   };
