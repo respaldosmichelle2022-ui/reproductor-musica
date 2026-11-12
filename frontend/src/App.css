@@ -1620,65 +1620,133 @@ body {
 }
 
 /* ============================================================
-   CORTINA ANTI-DISTRACCIÓN EN YOUTUBE (MODO OPERATIVO)
+   3. MODO SOLO AUDIO EN YOUTUBE: VIDRIO ESMERILADO (backdrop-filter: blur)
+      + VISUALIZADOR DE AUDIO ANIMADO + BOTÓN DISCRETO MOSTRAR/OCULTAR VIDEO
 ============================================================ */
 .yt-nodistraction-curtain {
   position: absolute;
   inset: 0;
   z-index: 25;
-  background: radial-gradient(circle at center, #1d2b24 0%, #101412 100%);
-  border: 1px solid rgba(29, 185, 84, 0.35);
+  background: radial-gradient(
+      circle at 50% 35%,
+      rgba(29, 185, 84, 0.16) 0%,
+      rgba(12, 16, 22, 0.78) 65%,
+      rgba(9, 11, 15, 0.88) 100%
+    );
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.55);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 24px;
+  padding: 28px 24px;
   box-sizing: border-box;
-  gap: 10px;
+  gap: 12px;
   user-select: none;
 }
 
 .yt-curtain-badge {
-  background: rgba(29, 185, 84, 0.18);
-  border: 1px solid rgba(29, 185, 84, 0.45);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(29, 185, 84, 0.14);
+  border: 1px solid rgba(29, 185, 84, 0.38);
   color: #6df09b;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 1px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.9px;
   padding: 5px 14px;
-  border-radius: 20px;
+  border-radius: 999px;
 }
 
-.yt-curtain-icon {
-  font-size: 3.4rem;
-  line-height: 1;
-  margin: 4px 0;
-  filter: drop-shadow(0 4px 12px rgba(29, 185, 84, 0.35));
+/* Visualizador de Audio Animado (Ecualizador de 9 barras) */
+.yt-audio-visualizer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  height: 54px;
+  margin: 6px 0 2px;
+  padding: 8px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.yt-audio-visualizer .eq-bar {
+  width: 5px;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #6df09b 0%, #1db954 60%, #117a37 100%);
+  box-shadow: 0 0 10px rgba(29, 185, 84, 0.45);
+  transform-origin: bottom;
+  transition: height 0.25s ease, opacity 0.25s ease;
+}
+
+.yt-audio-visualizer.playing .eq-bar {
+  animation: eqBarWave 1.15s ease-in-out infinite alternate;
+}
+
+.yt-audio-visualizer.playing .eq-bar:nth-child(1) { animation-duration: 0.75s; animation-delay: 0.05s; }
+.yt-audio-visualizer.playing .eq-bar:nth-child(2) { animation-duration: 0.95s; animation-delay: 0.20s; }
+.yt-audio-visualizer.playing .eq-bar:nth-child(3) { animation-duration: 0.65s; animation-delay: 0.10s; }
+.yt-audio-visualizer.playing .eq-bar:nth-child(4) { animation-duration: 1.05s; animation-delay: 0.30s; }
+.yt-audio-visualizer.playing .eq-bar:nth-child(5) { animation-duration: 0.70s; animation-delay: 0.00s; }
+.yt-audio-visualizer.playing .eq-bar:nth-child(6) { animation-duration: 0.90s; animation-delay: 0.25s; }
+.yt-audio-visualizer.playing .eq-bar:nth-child(7) { animation-duration: 0.80s; animation-delay: 0.15s; }
+.yt-audio-visualizer.playing .eq-bar:nth-child(8) { animation-duration: 1.00s; animation-delay: 0.35s; }
+.yt-audio-visualizer.playing .eq-bar:nth-child(9) { animation-duration: 0.72s; animation-delay: 0.12s; }
+
+.yt-audio-visualizer.paused .eq-bar {
+  height: 10px;
+  opacity: 0.45;
+  animation: none;
+}
+
+@keyframes eqBarWave {
+  0% {
+    height: 10px;
+    opacity: 0.65;
+  }
+  50% {
+    height: 26px;
+    opacity: 0.9;
+  }
+  100% {
+    height: 44px;
+    opacity: 1;
+  }
 }
 
 .yt-curtain-title {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: 1.55rem;
   font-weight: 800;
   color: #ffffff;
+  letter-spacing: -0.3px;
 }
 
 .yt-curtain-desc {
   margin: 0;
-  max-width: 520px;
-  font-size: 0.92rem;
-  color: #b8c7be;
+  max-width: 490px;
+  font-size: 0.88rem;
+  color: rgba(226, 232, 240, 0.78);
   line-height: 1.45;
 }
 
 .yt-curtain-nowplaying {
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 0.88rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 7px 15px;
+  border-radius: 999px;
+  font-size: 0.84rem;
   color: #e2f5e9;
   max-width: 90%;
   white-space: nowrap;
@@ -1686,12 +1754,50 @@ body {
   text-overflow: ellipsis;
 }
 
+.yt-curtain-nowplaying strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .yt-curtain-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: center;
-  margin-top: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+/* Botón discreto para 'Mostrar/Ocultar Video' */
+.btn-toggle-video-discreet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-toggle-video-discreet:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
+.btn-toggle-video-discreet.floating {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 26;
+  background: rgba(12, 15, 20, 0.72);
 }
 
 /* ============================================================
@@ -1729,8 +1835,11 @@ body {
 }
 
 .sidebar-brand-icon {
-  font-size: 1.65rem;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1db954;
+  flex-shrink: 0;
 }
 
 .sidebar-brand h1 {
@@ -1777,9 +1886,11 @@ body {
 }
 
 .sidebar-tab-icon {
-  font-size: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 22px;
-  text-align: center;
+  flex-shrink: 0;
 }
 
 .sidebar-tab-label {
@@ -1833,14 +1944,23 @@ body {
   position: relative;
 }
 
+.unified-search-leading-icon {
+  position: absolute;
+  left: 15px;
+  color: #888;
+  display: inline-flex;
+  align-items: center;
+  pointer-events: none;
+}
+
 .unified-search-box input {
   flex: 1;
-  padding: 12px 40px 12px 18px;
+  padding: 12px 40px 12px 42px;
   border-radius: 24px;
   border: 1px solid #333;
   background: #1e1e1e;
   color: #fff;
-  font-size: 0.96rem;
+  font-size: 0.95rem;
   outline: none;
   transition: border-color 0.2s, background 0.2s;
 }
@@ -1858,7 +1978,6 @@ body {
   height: 28px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 0.85rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1872,6 +1991,86 @@ body {
 .unified-search-btn {
   height: 42px;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Alineación limpia para iconos lineales (lucide-react) en botones y encabezados */
+.btn-primary,
+.btn-control,
+.btn-refresh-small,
+.btn-temp-pass,
+.btn-lock-folders,
+.btn-open-folder,
+.btn-fullscreen-native,
+.btn-download-link,
+.btn-spotify-small,
+.pill-btn,
+.lock-status-pill,
+.yt-channel-sub,
+.video-card-folder,
+.video-folder-badge,
+.badge-youtube-card,
+.temp-pass-active-banner,
+.security-error-msg,
+.spotify-error-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.heading-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.video-header-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.security-modal-header h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spotify-error-alert {
+  background: #3a1a1a;
+  border: 1px solid #e22134;
+  color: #ffb3b3;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 10px 0;
+  font-size: 0.88rem;
+}
+
+.play-symbol,
+.btn-heart-item,
+.btn-heart,
+.btn-play-row,
+.yt-sidebar-index,
+.track-idx {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes iconSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.icon-spin {
+  animation: iconSpin 0.9s linear infinite;
 }
 
 /* ============================================================
@@ -1915,12 +2114,12 @@ body {
   width: 52px;
   height: 52px;
   border-radius: 8px;
-  background: #1f2b23;
+  background: #1a241e;
   border: 1px solid rgba(29, 185, 84, 0.35);
+  color: #1ed760;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
   flex-shrink: 0;
 }
 
@@ -1969,10 +2168,12 @@ body {
   background: none;
   border: none;
   color: #d4d4d4;
-  font-size: 1.2rem;
   cursor: pointer;
-  padding: 4px 6px;
+  padding: 5px;
   border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: color 0.15s, transform 0.15s;
 }
 
@@ -1982,7 +2183,6 @@ body {
 }
 
 .bottom-ctrl-btn.small {
-  font-size: 0.95rem;
   opacity: 0.75;
 }
 
@@ -1998,8 +2198,6 @@ body {
   border: none;
   background: #1db954;
   color: #000;
-  font-size: 1.05rem;
-  font-weight: 800;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2045,9 +2243,11 @@ body {
   background: none;
   border: none;
   color: #ccc;
-  font-size: 1.15rem;
   cursor: pointer;
   padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .bottom-vol-slider {
@@ -2063,6 +2263,38 @@ body {
   width: 34px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   4. BARRAS DE SCROLL DELGADAS Y OSCURAS (::-webkit-scrollbar)
+============================================================ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2b2b2b #0e0e0e;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0e0e0e;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2b2b2b;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444444;
+}
+
+::-webkit-scrollbar-corner {
+  background: #0e0e0e;
 }
 
 /* Adaptación Responsiva para Celulares y Pantallas Pequeñas */

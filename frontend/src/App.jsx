@@ -1,5 +1,48 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
+import {
+  Music,
+  Cloud,
+  Film,
+  Heart,
+  MonitorPlay as Youtube,
+  Disc3,
+  Search,
+  X,
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Shuffle,
+  Repeat,
+  Volume2,
+  Volume1,
+  VolumeX,
+  Lock,
+  Unlock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Folder,
+  FolderOpen,
+  Copy,
+  Check,
+  Share2,
+  Maximize2,
+  Download,
+  ArrowLeft,
+  Headphones,
+  Crown,
+  Link2,
+  Flame,
+  Sparkles,
+  AlertTriangle,
+  Clock,
+  Radio,
+  ListMusic,
+  Loader2
+} from 'lucide-react';
 import './App.css';
 
 const API = import.meta.env.DEV ? 'http://localhost:8080' : '';
@@ -142,11 +185,29 @@ export default function App() {
     } catch {}
   };
 
+  const limpiarTituloMP3 = texto => {
+    if (!texto) return '';
+    return String(texto)
+      .replace(/\.mp3$/i, '')
+      .replace(/[_~]+/g, ' ')
+      .replace(/[\(\[][^)\]]*(?:official|oficial|video|audio|lyric|letra|hd|hq|4k|720p|1080p|remaster|live|en vivo|visualizer|mv|clip|\d+)[^)\]]*[\)\]]/gi, ' ')
+      .replace(/\[\s*\d+\s*\]|\(\s*\d+\s*\)/g, ' ')
+      .replace(/\b(?:official\s+music\s+video|official\s+video|video\s+oficial|video\s+official|official\s+audio|audio\s+oficial|lyric\s+video|video\s+original|subtitulado\s+espa[ñn]ol\s+ingles|hq|hd|4k|720p|1080p|0001)\b/gi, ' ')
+      .replace(/(?:^|\s)\d{1,2}\s*$/g, '')
+      .replace(/\(\s*\)|\[\s*\]/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/^[\s\-–—]+|[\s\-–—]+$/g, '')
+      .trim();
+  };
+
   const nombre = url => {
-    if (titulosMP3 && titulosMP3[url]) return titulosMP3[url];
+    if (!url) return '';
+    if (titulosMP3 && titulosMP3[url]) {
+      return limpiarTituloMP3(titulosMP3[url]);
+    }
     const sinParametros = url.split('?')[0];
-    let n = decodeURIComponent(sinParametros.split('/').pop()).replace(/\.mp3$/i, '');
-    return n.replace(/_/g, ' ').trim();
+    const crudo = decodeURIComponent(sinParametros.split('/').pop() || '');
+    return limpiarTituloMP3(crudo);
   };
 
   const toggleFavorito = (url, e) => {
@@ -935,12 +996,12 @@ export default function App() {
 
   const placeholderBuscadorActivo =
     tab === 'youtube'
-      ? '🔍 Buscar en YouTube en vivo o pegar enlace...'
+      ? 'Buscar en YouTube en vivo o pegar enlace...'
       : tab === 'spotify'
-        ? '🔍 Buscar canción, artista o grupo en Spotify...'
+        ? 'Buscar canción, artista o grupo en Spotify...'
         : tab === 'videos_nube'
-          ? '🔍 Filtrar videos por título...'
-          : '🔍 Filtrar canciones MP3 por nombre o artista...';
+          ? 'Filtrar videos por título...'
+          : 'Filtrar canciones MP3 por nombre o artista...';
 
   const manejarCambioBuscadorUnico = val => {
     if (tab === 'youtube') {
@@ -1009,7 +1070,9 @@ export default function App() {
       {/* 1. MENÚ LATERAL IZQUIERDO FIJO (220px) */}
       <aside className="app-sidebar">
         <div className="sidebar-brand">
-          <span className="sidebar-brand-icon">🎵</span>
+          <span className="sidebar-brand-icon">
+            <Music size={22} strokeWidth={2.2} />
+          </span>
           <h1>Reproductor Multimedia</h1>
         </div>
 
@@ -1018,7 +1081,9 @@ export default function App() {
             className={`sidebar-tab-btn ${tab === 'cloud' ? 'active' : ''}`}
             onClick={() => cambiarPestana('cloud')}
           >
-            <span className="sidebar-tab-icon">☁️</span>
+            <span className="sidebar-tab-icon">
+              <Cloud size={18} strokeWidth={2} />
+            </span>
             <span className="sidebar-tab-label">Mi Música</span>
             <span className="sidebar-tab-count">{mp3Tracks.length}</span>
           </button>
@@ -1027,7 +1092,9 @@ export default function App() {
             className={`sidebar-tab-btn ${tab === 'videos_nube' ? 'active' : ''}`}
             onClick={() => cambiarPestana('videos_nube')}
           >
-            <span className="sidebar-tab-icon">🎬</span>
+            <span className="sidebar-tab-icon">
+              <Film size={18} strokeWidth={2} />
+            </span>
             <span className="sidebar-tab-label">Mis Videos</span>
             <span className="sidebar-tab-count">{totalVideosNube || videosNube.length}</span>
           </button>
@@ -1036,7 +1103,9 @@ export default function App() {
             className={`sidebar-tab-btn ${tab === 'favorites' ? 'active' : ''}`}
             onClick={() => cambiarPestana('favorites')}
           >
-            <span className="sidebar-tab-icon">❤️</span>
+            <span className="sidebar-tab-icon">
+              <Heart size={18} strokeWidth={2} />
+            </span>
             <span className="sidebar-tab-label">Favoritas</span>
             <span className="sidebar-tab-count">{favoritos.length}</span>
           </button>
@@ -1045,7 +1114,9 @@ export default function App() {
             className={`sidebar-tab-btn ${tab === 'youtube' ? 'active' : ''}`}
             onClick={() => cambiarPestana('youtube')}
           >
-            <span className="sidebar-tab-icon">▶</span>
+            <span className="sidebar-tab-icon">
+              <Youtube size={18} strokeWidth={2} />
+            </span>
             <span className="sidebar-tab-label">YouTube</span>
             {ytVideos.length > 0 && <span className="sidebar-tab-count">{ytVideos.length}</span>}
           </button>
@@ -1054,7 +1125,9 @@ export default function App() {
             className={`sidebar-tab-btn ${tab === 'spotify' ? 'active' : ''}`}
             onClick={() => cambiarPestana('spotify')}
           >
-            <span className="sidebar-tab-icon">🟢</span>
+            <span className="sidebar-tab-icon">
+              <Disc3 size={18} strokeWidth={2} />
+            </span>
             <span className="sidebar-tab-label">Spotify</span>
             <span className="sidebar-tab-count">PRO</span>
           </button>
@@ -1066,6 +1139,9 @@ export default function App() {
         {/* 3. BUSCADOR ÚNICO SUPERIOR (Filtra o busca según la pestaña activa) */}
         <header className="top-search-header">
           <div className="unified-search-box">
+            <span className="unified-search-leading-icon">
+              <Search size={17} strokeWidth={2} />
+            </span>
             <input
               type="text"
               placeholder={placeholderBuscadorActivo}
@@ -1079,7 +1155,7 @@ export default function App() {
                 onClick={limpiarBuscadorUnico}
                 title="Limpiar búsqueda"
               >
-                ✕
+                <X size={14} strokeWidth={2.2} />
               </button>
             )}
             <button
@@ -1087,7 +1163,15 @@ export default function App() {
               onClick={ejecutarBuscadorUnico}
               disabled={buscando || ytBuscando || spotifyBuscando}
             >
-              {buscando || ytBuscando || spotifyBuscando ? '⏳ Buscando...' : '🔍 Buscar'}
+              {buscando || ytBuscando || spotifyBuscando ? (
+                <>
+                  <Loader2 size={15} className="icon-spin" /> Buscando...
+                </>
+              ) : (
+                <>
+                  <Search size={15} strokeWidth={2.2} /> Buscar
+                </>
+              )}
             </button>
           </div>
         </header>
@@ -1123,7 +1207,8 @@ export default function App() {
                   title="Recargar canciones de la nube"
                   disabled={cargandoMusica}
                 >
-                  {cargandoMusica ? 'Cargando...' : '🔄 Actualizar'}
+                  <RefreshCw size={14} className={cargandoMusica ? 'icon-spin' : ''} />
+                  {cargandoMusica ? 'Cargando...' : 'Actualizar'}
                 </button>
               )}
             </div>
@@ -1139,7 +1224,7 @@ export default function App() {
                   className={`pill-btn ${categoriaMusicaSeleccionada === c ? 'active' : ''}`}
                   onClick={() => setCategoriaMusicaSeleccionada(c)}
                 >
-                  🎵 {c}
+                  <Music size={14} strokeWidth={2} /> {c}
                 </button>
               ))}
             </div>
@@ -1148,32 +1233,48 @@ export default function App() {
           {audiosVisibles.length === 0 ? (
             <p className="empty-notice">
               {cargandoMusica
-                ? 'Conectando con la nube Backblaze...'
+                ? 'Conectando con la nube...'
                 : tab === 'favorites'
-                ? 'Aún no tienes canciones favoritas. Haz clic en el corazón 🤍 de cualquier canción.'
+                ? 'Aún no tienes canciones favoritas. Haz clic en el icono de corazón de cualquier canción.'
                 : filtro
                 ? `No se encontraron canciones con "${filtro}".`
                 : 'Cargando lista de canciones de la nube...'}
             </p>
           ) : (
             <ul className="track-list">
-              {audiosVisibles.map((url, idx) => (
-                <li
-                  key={url}
-                  className={`track-item ${url === current ? 'active' : ''}`}
-                  onClick={() => reproducirMP3(url)}
-                >
-                  <span className="track-number">{idx + 1}</span>
-                  <span className="play-symbol">{url === current ? '⏸' : '▶'}</span>
-                  <span className="track-title">{nombre(url)}</span>
-                  <button
-                    className="btn-heart-item"
-                    onClick={e => toggleFavorito(url, e)}
+              {audiosVisibles.map((url, idx) => {
+                const esFavorito = favoritos.includes(url);
+                const esActual = url === current;
+                return (
+                  <li
+                    key={url}
+                    className={`track-item ${esActual ? 'active' : ''}`}
+                    onClick={() => reproducirMP3(url)}
                   >
-                    {favoritos.includes(url) ? '❤️' : '🤍'}
-                  </button>
-                </li>
-              ))}
+                    <span className="track-number">{idx + 1}</span>
+                    <span className="play-symbol">
+                      {esActual && !mp3Pausado ? (
+                        <Pause size={15} strokeWidth={2.3} />
+                      ) : (
+                        <Play size={15} strokeWidth={2.3} />
+                      )}
+                    </span>
+                    <span className="track-title">{nombre(url)}</span>
+                    <button
+                      className={`btn-heart-item ${esFavorito ? 'is-fav' : ''}`}
+                      onClick={e => toggleFavorito(url, e)}
+                      title={esFavorito ? 'Quitar de Favoritas' : 'Agregar a Favoritas'}
+                    >
+                      <Heart
+                        size={16}
+                        strokeWidth={2}
+                        fill={esFavorito ? '#1db954' : 'none'}
+                        color={esFavorito ? '#1db954' : 'currentColor'}
+                      />
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
@@ -1184,10 +1285,12 @@ export default function App() {
         <section className="section-content">
           <div className="section-header">
             <div>
-              <h2>🎬 Mis Videos en la Nube</h2>
+              <h2 className="heading-with-icon">
+                <Film size={22} strokeWidth={2} /> Mis Videos en la Nube
+              </h2>
               <p className="video-privacy-sub">
                 {carpetaSeleccionada
-                  ? `Carpeta abierta: 📁 ${carpetaSeleccionada}`
+                  ? `Carpeta abierta: ${carpetaSeleccionada}`
                   : 'Selecciona una carpeta e ingresa la contraseña o pase temporal para ver su contenido.'}
               </p>
             </div>
@@ -1201,7 +1304,7 @@ export default function App() {
                     setCurrentVideoNube(null);
                   }}
                 >
-                  ⬅ Volver a Carpetas
+                  <ArrowLeft size={15} strokeWidth={2.2} /> Volver a Carpetas
                 </button>
               )}
 
@@ -1213,13 +1316,13 @@ export default function App() {
                     setPaseGenerado(null);
                   }}
                 >
-                  🔑 Crear Pase Temporal
+                  <KeyRound size={15} strokeWidth={2} /> Crear Pase Temporal
                 </button>
               )}
 
               {carpetasDesbloqueadas.length > 0 && (
                 <button className="btn-lock-folders" onClick={bloquearCarpetasVideos}>
-                  🔒 Bloquear Carpetas
+                  <Lock size={14} strokeWidth={2} /> Bloquear Carpetas
                 </button>
               )}
             </div>
@@ -1227,7 +1330,7 @@ export default function App() {
 
           {expiracionPaseMs && (
             <div className="temp-pass-active-banner">
-              ⏳ Acceso con pase temporal activo (válido hasta las{' '}
+              <Clock size={15} strokeWidth={2} /> Acceso con pase temporal activo (válido hasta las{' '}
               {new Date(expiracionPaseMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
             </div>
           )}
@@ -1250,9 +1353,23 @@ export default function App() {
                       onClick={() => intentarAbrirCarpeta(item.nombre)}
                     >
                       <div className="locked-folder-icon-wrap">
-                        <span className="locked-folder-emoji">📁</span>
+                        <span className="locked-folder-emoji">
+                          {desbloqueada ? (
+                            <FolderOpen size={28} strokeWidth={1.8} />
+                          ) : (
+                            <Folder size={28} strokeWidth={1.8} />
+                          )}
+                        </span>
                         <span className={`lock-status-pill ${desbloqueada ? 'open' : 'closed'}`}>
-                          {desbloqueada ? '🔓 Desbloqueada' : '🔒 Con contraseña'}
+                          {desbloqueada ? (
+                            <>
+                              <Unlock size={12} strokeWidth={2.2} /> Desbloqueada
+                            </>
+                          ) : (
+                            <>
+                              <Lock size={12} strokeWidth={2.2} /> Con contraseña
+                            </>
+                          )}
                         </span>
                       </div>
                       <div className="locked-folder-info">
@@ -1262,7 +1379,15 @@ export default function App() {
                         </span>
                       </div>
                       <button className="btn-open-folder">
-                        {desbloqueada ? 'Abrir carpeta →' : '🔑 Ingresar contraseña'}
+                        {desbloqueada ? (
+                          <>
+                            <FolderOpen size={15} strokeWidth={2} /> Abrir carpeta
+                          </>
+                        ) : (
+                          <>
+                            <KeyRound size={15} strokeWidth={2} /> Ingresar contraseña
+                          </>
+                        )}
                       </button>
                     </div>
                   );
@@ -1275,15 +1400,18 @@ export default function App() {
               {currentVideoNube && (
                 <div className="video-player-box">
                   <div className="video-header-bar">
-                    <div>
-                      <strong>🎬 {currentVideoNube.titulo}</strong>
-                      <span className="video-folder-badge">📁 {currentVideoNube.carpeta}</span>
+                    <div className="video-header-title-wrap">
+                      <Film size={16} strokeWidth={2} />
+                      <strong>{currentVideoNube.titulo}</strong>
+                      <span className="video-folder-badge">
+                        <Folder size={12} strokeWidth={2} /> {currentVideoNube.carpeta}
+                      </span>
                     </div>
                     <div className="video-actions">
                       {currentVideoNube.tipo !== 'youtube' && (
                         <>
                           <button className="btn-fullscreen-native" onClick={pantallaCompletaVideo}>
-                            ⛶ Pantalla Completa
+                            <Maximize2 size={14} strokeWidth={2} /> Pantalla Completa
                           </button>
                           <a
                             href={currentVideoNube.url}
@@ -1292,7 +1420,7 @@ export default function App() {
                             target="_blank"
                             rel="noreferrer"
                           >
-                            ⬇️ Descargar
+                            <Download size={14} strokeWidth={2} /> Descargar
                           </a>
                         </>
                       )}
@@ -1342,15 +1470,21 @@ export default function App() {
                               alt={v.titulo}
                               className="video-card-thumb-img"
                             />
-                            <span className="badge-youtube-card">▶ Reproducir</span>
+                            <span className="badge-youtube-card">
+                              <Play size={13} strokeWidth={2.4} /> Reproducir
+                            </span>
                           </>
                         ) : (
-                          <span className="video-play-icon">▶</span>
+                          <span className="video-play-icon">
+                            <Play size={28} strokeWidth={2} />
+                          </span>
                         )}
                       </div>
                       <div className="video-card-info">
                         <h4>{v.titulo}</h4>
-                        <span className="video-card-folder">📁 {v.carpeta}</span>
+                        <span className="video-card-folder">
+                          <Folder size={12} strokeWidth={2} /> {v.carpeta}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -1364,9 +1498,11 @@ export default function App() {
             <div className="security-modal-backdrop" onClick={() => setModalClaveCarpeta('')}>
               <div className="security-modal-card" onClick={e => e.stopPropagation()}>
                 <div className="security-modal-header">
-                  <h3>🔒 Carpeta Privada: {modalClaveCarpeta}</h3>
+                  <h3>
+                    <Lock size={17} strokeWidth={2.2} /> Carpeta Privada: {modalClaveCarpeta}
+                  </h3>
                   <button className="modal-close-x" onClick={() => setModalClaveCarpeta('')}>
-                    ✕
+                    <X size={16} strokeWidth={2.2} />
                   </button>
                 </div>
                 <p className="security-modal-desc">
@@ -1381,7 +1517,11 @@ export default function App() {
                   onKeyDown={e => e.key === 'Enter' && confirmarDesbloqueoCarpeta()}
                   autoFocus
                 />
-                {errorClaveVideo && <div className="security-error-msg">⚠️ {errorClaveVideo}</div>}
+                {errorClaveVideo && (
+                  <div className="security-error-msg">
+                    <AlertTriangle size={14} strokeWidth={2} /> {errorClaveVideo}
+                  </div>
+                )}
                 <div className="security-modal-footer">
                   <button className="btn-control" onClick={() => setModalClaveCarpeta('')}>
                     Cancelar
@@ -1391,7 +1531,13 @@ export default function App() {
                     onClick={confirmarDesbloqueoCarpeta}
                     disabled={verificandoClave}
                   >
-                    {verificandoClave ? 'Verificando...' : '🔓 Desbloquear'}
+                    {verificandoClave ? (
+                      'Verificando...'
+                    ) : (
+                      <>
+                        <Unlock size={15} strokeWidth={2} /> Desbloquear
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -1405,9 +1551,11 @@ export default function App() {
         <div className="security-modal-backdrop" onClick={() => setModalGenerarPase(false)}>
           <div className="security-modal-card" onClick={e => e.stopPropagation()}>
             <div className="security-modal-header">
-              <h3>🔑 Generador de Pase Temporal</h3>
+              <h3>
+                <KeyRound size={17} strokeWidth={2.2} /> Generador de Pase Temporal
+              </h3>
               <button className="modal-close-x" onClick={() => setModalGenerarPase(false)}>
-                ✕
+                <X size={16} strokeWidth={2.2} />
               </button>
             </div>
             <p className="security-modal-desc">
@@ -1420,11 +1568,11 @@ export default function App() {
               value={paseCarpetaDestino}
               onChange={e => setPaseCarpetaDestino(e.target.value)}
             >
-              <option value="TODAS">🔓 Todo (Carpetas de Videos + Pantalla de YouTube)</option>
-              <option value="YOUTUBE">▶ Solo Pantalla de YouTube</option>
+              <option value="TODAS">Todo (Carpetas de Videos + Pantalla de YouTube)</option>
+              <option value="YOUTUBE">Solo Pantalla de YouTube</option>
               {carpetasVideos.map(c => (
                 <option key={c} value={c}>
-                  📁 Solo carpeta: {c}
+                  Solo carpeta: {c}
                 </option>
               ))}
             </select>
@@ -1435,15 +1583,15 @@ export default function App() {
               value={paseMinutos}
               onChange={e => setPaseMinutos(Number(e.target.value))}
             >
-              <option value={15}>⏱️ 15 minutos</option>
-              <option value={30}>⏱️ 30 minutos</option>
-              <option value={60}>⏱️ 1 hora</option>
-              <option value={180}>⏱️ 3 horas</option>
-              <option value={1440}>⏱️ 24 horas (1 día)</option>
+              <option value={15}>15 minutos</option>
+              <option value={30}>30 minutos</option>
+              <option value={60}>1 hora</option>
+              <option value={180}>3 horas</option>
+              <option value={1440}>24 horas (1 día)</option>
             </select>
 
             <button className="btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={generarPaseAdmin}>
-              ✨ Generar Código Temporal
+              <Sparkles size={15} strokeWidth={2} /> Generar Código Temporal
             </button>
 
             {paseGenerado && (
@@ -1465,7 +1613,15 @@ export default function App() {
                       setCopiadoPase(true);
                     }}
                   >
-                    {copiadoPase ? '✅ ¡Copiado!' : '📋 Copiar código'}
+                    {copiadoPase ? (
+                      <>
+                        <Check size={15} strokeWidth={2.2} /> ¡Copiado!
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={15} strokeWidth={2} /> Copiar código
+                      </>
+                    )}
                   </button>
                   <a
                     className="btn-whatsapp-pass"
@@ -1475,7 +1631,7 @@ export default function App() {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    📲 Enviar por WhatsApp
+                    <Share2 size={15} strokeWidth={2} /> Enviar por WhatsApp
                   </a>
                 </div>
               </div>
@@ -1487,17 +1643,30 @@ export default function App() {
       {/* PESTAÑA: YOUTUBE (DISEÑO IDÉNTICO A YOUTUBE + CORTINA ANTI-DISTRACCIÓN PROTEGIBLE CON CONTRASEÑA) */}
       {tab === 'youtube' && (() => {
         const videoActivoObj = ytVideos.find(v => v.id.videoId === currentVideo) || ytVideos[0];
+        const alternarVisibilidadVideoYT = e => {
+          if (e) e.stopPropagation();
+          if (ytPantallaBloqueada) {
+            setModalDesbloquearYT(true);
+            setInputClaveYT('');
+            setErrorClaveYT('');
+          } else {
+            setYtPantallaBloqueada(true);
+          }
+        };
+
         return (
           <section className="section-content yt-watch-section">
             {/* Barra superior de YouTube (el buscador está unificado arriba) */}
             <div className="yt-top-bar">
               <div className="yt-brand-logo">
-                <span className="yt-logo-icon">▶</span>
+                <span className="yt-logo-icon">
+                  <Youtube size={18} strokeWidth={2.2} />
+                </span>
                 <span className="yt-logo-text">YouTube</span>
                 <span className="yt-logo-country">MX</span>
               </div>
 
-              {/* Botones de Modo Operativo: Desbloquear, Crear Pase Temporal y volver a Tapar Pantalla */}
+              {/* Botones de Modo Operativo: Crear Pase Temporal y Mostrar/Ocultar Video */}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {esAdminVideos && (
                   <button
@@ -1509,30 +1678,25 @@ export default function App() {
                     }}
                     title="Generar código temporal para que alguien pueda ver videos de YouTube o abrir carpetas"
                   >
-                    🔑 Crear Pase Temporal
+                    <KeyRound size={14} strokeWidth={2} /> Crear Pase Temporal
                   </button>
                 )}
-                {ytPantallaBloqueada ? (
-                  <button
-                    className="btn-temp-pass"
-                    onClick={() => {
-                      setModalDesbloquearYT(true);
-                      setInputClaveYT('');
-                      setErrorClaveYT('');
-                    }}
-                    title="Desbloquear imagen del video con contraseña"
-                  >
-                    🔓 Desbloquear Video
-                  </button>
-                ) : (
-                  <button
-                    className="btn-lock-folders"
-                    onClick={() => setYtPantallaBloqueada(true)}
-                    title="Volver a tapar la pantalla de video para evitar distracciones"
-                  >
-                    🙈 Tapar Pantalla (Modo Operativo)
-                  </button>
-                )}
+                <button
+                  className="btn-toggle-video-discreet"
+                  onClick={alternarVisibilidadVideoYT}
+                  title={
+                    ytPantallaBloqueada
+                      ? 'Mostrar imagen del video (requiere contraseña o pase)'
+                      : 'Ocultar imagen del video (modo solo audio)'
+                  }
+                >
+                  {ytPantallaBloqueada ? (
+                    <Eye size={14} strokeWidth={2} />
+                  ) : (
+                    <EyeOff size={14} strokeWidth={2} />
+                  )}
+                  <span>Mostrar/Ocultar Video</span>
+                </button>
               </div>
             </div>
 
@@ -1543,35 +1707,69 @@ export default function App() {
                   <div className="yt-embed-container">
                     <div id="youtube-player-container" />
 
-                    {/* CORTINA ANTI-DISTRACCIÓN SOBRE LA PANTALLA DE VIDEO */}
+                    {!ytPantallaBloqueada && (
+                      <button
+                        className="btn-toggle-video-discreet floating"
+                        onClick={alternarVisibilidadVideoYT}
+                        title="Ocultar video y volver al modo solo audio"
+                      >
+                        <EyeOff size={14} strokeWidth={2} />
+                        <span>Mostrar/Ocultar Video</span>
+                      </button>
+                    )}
+
+                    {/* CUADRO MODO SOLO AUDIO: VIDRIO ESMERILADO + VISUALIZADOR ANIMADO */}
                     {ytPantallaBloqueada && (
                       <div className="yt-nodistraction-curtain">
-                        <span className="yt-curtain-badge">🔒 MODO OPERATIVO • SOLO AUDIO ACTIVO</span>
-                        <div className="yt-curtain-icon">🎧</div>
-                        <h3 className="yt-curtain-title">¡No te distraigas! 🎶</h3>
+                        <span className="yt-curtain-badge">
+                          <Headphones size={13} strokeWidth={2.2} /> MODO SOLO AUDIO • SIN DISTRACCIONES
+                        </span>
+
+                        <div
+                          className={`yt-audio-visualizer ${!ytPausado ? 'playing' : 'paused'}`}
+                          aria-hidden="true"
+                        >
+                          <span className="eq-bar" />
+                          <span className="eq-bar" />
+                          <span className="eq-bar" />
+                          <span className="eq-bar" />
+                          <span className="eq-bar" />
+                          <span className="eq-bar" />
+                          <span className="eq-bar" />
+                          <span className="eq-bar" />
+                          <span className="eq-bar" />
+                        </div>
+
+                        <h3 className="yt-curtain-title">Modo Solo Audio Activo</h3>
                         <p className="yt-curtain-desc">
-                          La música sigue sonando para acompañarte en tus actividades sin distracciones visuales.
-                          Puedes cambiar de canción o buscar más música en la lista de la derecha.
+                          La música sigue sonando en segundo plano sin distracciones visuales.
+                          Elige cualquier pista en la columna derecha para cambiar de canción.
                         </p>
                         {videoActivoObj && (
                           <div className="yt-curtain-nowplaying">
-                            {ytPausado ? '⏸ En pausa:' : '🎵 Sonando ahora:'}{' '}
+                            <Music size={14} strokeWidth={2.2} />
+                            <span>{ytPausado ? 'En pausa:' : 'Sonando ahora:'}</span>{' '}
                             <strong>{videoActivoObj.snippet.title}</strong>
                           </div>
                         )}
                         <div className="yt-curtain-actions">
                           <button className="btn-primary" onClick={togglePlayYouTube}>
-                            {ytPausado ? '▶ Reanudar Música' : '⏸ Pausar Música'}
+                            {ytPausado ? (
+                              <>
+                                <Play size={15} strokeWidth={2.3} /> Reanudar Audio
+                              </>
+                            ) : (
+                              <>
+                                <Pause size={15} strokeWidth={2.3} /> Pausar Audio
+                              </>
+                            )}
                           </button>
                           <button
-                            className="btn-control"
-                            onClick={() => {
-                              setModalDesbloquearYT(true);
-                              setInputClaveYT('');
-                              setErrorClaveYT('');
-                            }}
+                            className="btn-toggle-video-discreet"
+                            onClick={alternarVisibilidadVideoYT}
                           >
-                            🔑 Desbloquear Video
+                            <Eye size={14} strokeWidth={2} />
+                            <span>Mostrar/Ocultar Video</span>
                           </button>
                         </div>
                       </div>
@@ -1583,12 +1781,44 @@ export default function App() {
                     onClick={() => ytVideos[0] && reproducirYouTube(ytVideos[0].id.videoId, 0)}
                   >
                     <div className="yt-nodistraction-curtain" style={{ cursor: 'pointer' }}>
-                      <span className="yt-curtain-badge">🎧 MODO OPERATIVO • SIN DISTRACCIÓN</span>
-                      <div className="yt-big-play-btn" style={{ margin: '10px 0' }}>▶</div>
-                      <h3 className="yt-curtain-title">¡No te distraigas! Escucha tu música aquí</h3>
+                      <span className="yt-curtain-badge">
+                        <Headphones size={13} strokeWidth={2.2} /> MODO SOLO AUDIO • SIN DISTRACCIONES
+                      </span>
+
+                      <div className="yt-audio-visualizer paused" aria-hidden="true">
+                        <span className="eq-bar" />
+                        <span className="eq-bar" />
+                        <span className="eq-bar" />
+                        <span className="eq-bar" />
+                        <span className="eq-bar" />
+                        <span className="eq-bar" />
+                        <span className="eq-bar" />
+                        <span className="eq-bar" />
+                        <span className="eq-bar" />
+                      </div>
+
+                      <h3 className="yt-curtain-title">Escucha tu música sin distracciones</h3>
                       <p className="yt-curtain-desc">
-                        Haz clic aquí o elige cualquier canción de las sugerencias a la derecha para empezar a escuchar.
+                        Haz clic para iniciar o selecciona una canción en la lista de sugerencias a la derecha.
                       </p>
+                      <div className="yt-curtain-actions">
+                        <button
+                          className="btn-primary"
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (ytVideos[0]) reproducirYouTube(ytVideos[0].id.videoId, 0);
+                          }}
+                        >
+                          <Play size={15} strokeWidth={2.3} /> Reproducir Música
+                        </button>
+                        <button
+                          className="btn-toggle-video-discreet"
+                          onClick={alternarVisibilidadVideoYT}
+                        >
+                          <Eye size={14} strokeWidth={2} />
+                          <span>Mostrar/Ocultar Video</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1600,35 +1830,61 @@ export default function App() {
 
                   <div className="yt-watch-meta-bar">
                     <div className="yt-channel-badge">
-                      <div className="yt-channel-avatar">▶</div>
+                      <div className="yt-channel-avatar">
+                        <Youtube size={18} strokeWidth={2.2} />
+                      </div>
                       <div>
                         <div className="yt-channel-title">
                           {videoActivoObj?.snippet?.channelTitle || 'YouTube Music'}
                         </div>
                         <div className="yt-channel-sub">
-                          {ytPantallaBloqueada ? '🔒 Video cubierto (Solo Audio)' : '🔓 Video visible'}
+                          {ytPantallaBloqueada ? (
+                            <>
+                              <Lock size={12} strokeWidth={2} /> Video cubierto (Solo Audio)
+                            </>
+                          ) : (
+                            <>
+                              <Unlock size={12} strokeWidth={2} /> Video visible
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
 
                     <div className="yt-controls-bar">
                       <button className="btn-control" onClick={anteriorYouTube} disabled={!currentVideo}>
-                        ⏮ Anterior
+                        <SkipBack size={15} strokeWidth={2.2} /> Anterior
                       </button>
                       {currentVideo && (
                         <button className="btn-control" onClick={togglePlayYouTube}>
-                          {ytPausado ? '▶ Reproducir' : '⏸ Pausar'}
+                          {ytPausado ? (
+                            <>
+                              <Play size={15} strokeWidth={2.2} /> Reproducir
+                            </>
+                          ) : (
+                            <>
+                              <Pause size={15} strokeWidth={2.2} /> Pausar
+                            </>
+                          )}
                         </button>
                       )}
                       <button className="btn-control" onClick={siguienteYouTube} disabled={!currentVideo}>
-                        Siguiente Recomendada ⏭
+                        Siguiente Recomendada <SkipForward size={15} strokeWidth={2.2} />
                       </button>
                       <button
                         className={`btn-mode-toggle ${modoRadioYT ? 'active' : ''}`}
                         onClick={() => setModoRadioYT(!modoRadioYT)}
                         title="Cambia entre reproducir sugerencias de YouTube o la lista buscada"
                       >
-                        {modoRadioYT ? '📻 Radio Sugerencias: ACTIVADO' : '📋 Lista Búsqueda: FIJA'}
+                        {modoRadioYT ? (
+                          <>
+                            <Radio size={15} strokeWidth={2} /> Radio Sugerencias: ACTIVADO
+                          </>
+                        ) : (
+                          <>
+                            <ListMusic size={15} strokeWidth={2} /> Lista Búsqueda: FIJA
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -1663,7 +1919,9 @@ export default function App() {
                         className={`yt-sidebar-card ${esActivo ? 'active' : ''}`}
                         onClick={() => reproducirYouTube(v.id.videoId, idx)}
                       >
-                        <span className="yt-sidebar-index">{esActivo ? '▶' : idx + 1}</span>
+                        <span className="yt-sidebar-index">
+                          {esActivo ? <Play size={13} strokeWidth={2.5} /> : idx + 1}
+                        </span>
                         <div className="yt-sidebar-thumb">
                           <img src={v.snippet.thumbnails.default.url} alt={v.snippet.title} />
                           {v.snippet.duration && (
@@ -1688,13 +1946,15 @@ export default function App() {
               <div className="security-modal-backdrop" onClick={() => setModalDesbloquearYT(false)}>
                 <div className="security-modal-card" onClick={e => e.stopPropagation()}>
                   <div className="security-modal-header">
-                    <h3>🔓 Desbloquear Pantalla de YouTube</h3>
+                    <h3>
+                      <Unlock size={17} strokeWidth={2.2} /> Mostrar Video de YouTube
+                    </h3>
                     <button className="modal-close-x" onClick={() => setModalDesbloquearYT(false)}>
-                      ✕
+                      <X size={16} strokeWidth={2.2} />
                     </button>
                   </div>
                   <p className="security-modal-desc">
-                    Ingresa tu contraseña maestra o un código de pase temporal para quitar la cubierta y ver el video en pantalla.
+                    Ingresa tu contraseña maestra o un código de pase temporal para quitar el modo solo audio y mostrar el video en pantalla.
                   </p>
                   <input
                     type="password"
@@ -1705,7 +1965,11 @@ export default function App() {
                     onKeyDown={e => e.key === 'Enter' && confirmarDesbloqueoYouTube()}
                     autoFocus
                   />
-                  {errorClaveYT && <div className="security-error-msg">⚠️ {errorClaveYT}</div>}
+                  {errorClaveYT && (
+                    <div className="security-error-msg">
+                      <AlertTriangle size={14} strokeWidth={2} /> {errorClaveYT}
+                    </div>
+                  )}
                   <div className="security-modal-footer">
                     <button className="btn-control" onClick={() => setModalDesbloquearYT(false)}>
                       Cancelar
@@ -1715,7 +1979,13 @@ export default function App() {
                       onClick={confirmarDesbloqueoYouTube}
                       disabled={verificandoClaveYT}
                     >
-                      {verificandoClaveYT ? 'Verificando...' : '🔓 Mostrar Video'}
+                      {verificandoClaveYT ? (
+                        'Verificando...'
+                      ) : (
+                        <>
+                          <Eye size={15} strokeWidth={2} /> Mostrar Video
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1746,14 +2016,15 @@ export default function App() {
             <div className="spotify-user-actions">
               <div className="spotify-profile-badge">
                 <div className="spotify-avatar-fallback" style={{ background: '#1DB954', color: '#000', fontWeight: 800 }}>
-                  ★
+                  <Crown size={16} strokeWidth={2.3} />
                 </div>
                 <div className="spotify-profile-info">
                   <span className="spotify-user-name">
                     {spotifyUser?.display_name || 'Cuenta Cloud Activa'}
                   </span>
                   <span className="badge-subscription premium">
-                    👑 PREMIUM MULTIUSUARIO
+                    <Crown size={11} strokeWidth={2.4} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                    PREMIUM MULTIUSUARIO
                   </span>
                 </div>
               </div>
@@ -1761,8 +2032,8 @@ export default function App() {
           </div>
 
           {spotifyError && (
-            <div style={{ background: '#3a1a1a', border: '1px solid #e22134', color: '#ffb3b3', borderRadius: 8, padding: '10px 14px', margin: '10px 0', fontSize: 14 }}>
-              ⚠️ {spotifyError}
+            <div className="spotify-error-alert">
+              <AlertTriangle size={16} strokeWidth={2} /> {spotifyError}
             </div>
           )}
 
@@ -1772,19 +2043,19 @@ export default function App() {
               className={`pill-btn ${spotifySubTab === 'recomendadas' ? 'active' : ''}`}
               onClick={() => setSpotifySubTab('recomendadas')}
             >
-              🔥 Éxitos y Recomendadas
+              <Flame size={15} strokeWidth={2} /> Éxitos y Recomendadas
             </button>
             <button
               className={`pill-btn ${spotifySubTab === 'buscar' ? 'active' : ''}`}
               onClick={() => setSpotifySubTab('buscar')}
             >
-              🔍 Resultados de Búsqueda
+              <Search size={15} strokeWidth={2} /> Resultados de Búsqueda
             </button>
             <button
               className={`pill-btn ${spotifySubTab === 'link' ? 'active' : ''}`}
               onClick={() => setSpotifySubTab('link')}
             >
-              🔗 Pegar Enlace Directo
+              <Link2 size={15} strokeWidth={2} /> Pegar Enlace Directo
             </button>
           </div>
 
@@ -1826,15 +2097,15 @@ export default function App() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: 56,
+                            color: '#ffffff',
                             aspectRatio: '1 / 1',
                             borderRadius: 8
                           }}
                         >
-                          {pl.emoji}
+                          <Disc3 size={48} strokeWidth={1.6} />
                         </div>
                         <button className="spotify-play-hover-btn" title="Reproducir lista completa">
-                          ▶
+                          <Play size={18} strokeWidth={2.5} fill="currentColor" />
                         </button>
                       </div>
                       <div className="spotify-card-text">
@@ -1850,15 +2121,15 @@ export default function App() {
               {spotifyPlaylistActiva && (
                 <div className="spotify-results-section" style={{ marginTop: 28 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
-                    <h3 className="spotify-section-heading" style={{ margin: 0 }}>
-                      {spotifyPlaylistActiva.emoji} Canciones de: {spotifyPlaylistActiva.titulo}
+                    <h3 className="spotify-section-heading heading-with-icon" style={{ margin: 0 }}>
+                      <ListMusic size={18} strokeWidth={2.2} /> Canciones de: {spotifyPlaylistActiva.titulo}
                     </h3>
                     {spotifyPistasLista.length > 0 && (
                       <button
                         className="btn-spotify-small"
                         onClick={() => reproducirPistaSpotifyMulti(spotifyPistasLista[0], spotifyPistasLista, 0)}
                       >
-                        ▶ Reproducir toda la lista
+                        <Play size={14} strokeWidth={2.4} /> Reproducir toda la lista
                       </button>
                     )}
                   </div>
@@ -1877,7 +2148,7 @@ export default function App() {
                             onClick={() => reproducirPistaSpotifyMulti(t, spotifyPistasLista, idx)}
                           >
                             <span className="track-idx" style={esActiva ? { color: '#1DB954', fontWeight: 800 } : undefined}>
-                              {esActiva ? '▶' : idx + 1}
+                              {esActiva ? <Play size={13} strokeWidth={2.5} /> : idx + 1}
                             </span>
                             <img
                               src={t.album?.images?.[2]?.url || t.album?.images?.[0]?.url}
@@ -1896,7 +2167,11 @@ export default function App() {
                               {String(Math.floor(((t.duration_ms || 0) % 60000) / 1000)).padStart(2, '0')}
                             </span>
                             <button className="btn-play-row" title="Reproducir canción completa">
-                              {esActiva && !spotifyPausadoMulti ? '⏸' : '▶'}
+                              {esActiva && !spotifyPausadoMulti ? (
+                                <Pause size={15} strokeWidth={2.3} />
+                              ) : (
+                                <Play size={15} strokeWidth={2.3} />
+                              )}
                             </button>
                           </div>
                         );
@@ -1936,7 +2211,7 @@ export default function App() {
                             }
                           >
                             <span className="track-idx" style={esActiva ? { color: '#1DB954', fontWeight: 800 } : undefined}>
-                              {esActiva ? '▶' : idx + 1}
+                              {esActiva ? <Play size={13} strokeWidth={2.5} /> : idx + 1}
                             </span>
                             <img
                               src={t.album?.images?.[2]?.url || t.album?.images?.[0]?.url}
@@ -1955,7 +2230,11 @@ export default function App() {
                               {String(Math.floor(((t.duration_ms || 0) % 60000) / 1000)).padStart(2, '0')}
                             </span>
                             <button className="btn-play-row" title="Reproducir">
-                              {esActiva && !spotifyPausadoMulti ? '⏸' : '▶'}
+                              {esActiva && !spotifyPausadoMulti ? (
+                                <Pause size={15} strokeWidth={2.3} />
+                              ) : (
+                                <Play size={15} strokeWidth={2.3} />
+                              )}
                             </button>
                           </div>
                         );
@@ -2004,7 +2283,7 @@ export default function App() {
         let tituloBarra = 'Selecciona una canción o video';
         let subtituloBarra = 'Listo para reproducir';
         let miniaturaBarra = null;
-        let iconoBarra = '🎵';
+        let iconoBarra = <Music size={22} strokeWidth={2} />;
         let enPausa = true;
         let posSeg = 0;
         let durSeg = 0;
@@ -2013,34 +2292,34 @@ export default function App() {
         if (spotifyTrackActual) {
           fuente = 'spotify';
           tituloBarra = spotifyTrackActual.name;
-          subtituloBarra = `${spotifyTrackActual.artists?.map(a => a.name).join(', ') || 'Spotify'} • 🟢 Spotify`;
+          subtituloBarra = `${spotifyTrackActual.artists?.map(a => a.name).join(', ') || 'Spotify'} • Spotify`;
           miniaturaBarra = spotifyTrackActual.album?.images?.[2]?.url || spotifyTrackActual.album?.images?.[0]?.url;
-          iconoBarra = '🟢';
+          iconoBarra = <Disc3 size={22} strokeWidth={2} />;
           enPausa = spotifyPausadoMulti;
           posSeg = Math.floor((spotifyPos || 0) / 1000);
           durSeg = Math.floor((spotifyDuracionMs || spotifyTrackActual.duration_ms || 210000) / 1000);
         } else if (current) {
           fuente = 'mp3';
           tituloBarra = nombre(current);
-          subtituloBarra = '☁️ Mi Música en la Nube';
-          iconoBarra = '🎵';
+          subtituloBarra = 'Mi Música en la Nube';
+          iconoBarra = <Music size={22} strokeWidth={2} />;
           enPausa = mp3Pausado;
           posSeg = mp3TiempoSeg;
           durSeg = mp3DuracionSeg;
         } else if (currentVideo) {
           fuente = 'youtube';
           tituloBarra = videoYT?.snippet?.title || 'Reproduciendo en YouTube';
-          subtituloBarra = `${videoYT?.snippet?.channelTitle || 'YouTube'} • ▶ YouTube`;
+          subtituloBarra = `${videoYT?.snippet?.channelTitle || 'YouTube'} • YouTube`;
           miniaturaBarra = videoYT?.snippet?.thumbnails?.default?.url;
-          iconoBarra = '▶';
+          iconoBarra = <Youtube size={22} strokeWidth={2} />;
           enPausa = ytPausado;
           posSeg = ytTiempoSeg;
           durSeg = ytDuracionSeg;
         } else if (currentVideoNube) {
           fuente = 'video_nube';
           tituloBarra = currentVideoNube.titulo;
-          subtituloBarra = `🎬 Mis Videos • 📁 ${currentVideoNube.carpeta}`;
-          iconoBarra = '🎬';
+          subtituloBarra = `Mis Videos • ${currentVideoNube.carpeta}`;
+          iconoBarra = <Film size={22} strokeWidth={2} />;
           enPausa = false;
         }
 
@@ -2091,6 +2370,8 @@ export default function App() {
           }
         };
 
+        const esFavActual = fuente === 'mp3' && current && favoritos.includes(current);
+
         return (
           <footer className="bottom-player-bar">
             {/* Izquierda: Canción / Video Actual */}
@@ -2114,7 +2395,12 @@ export default function App() {
                   onClick={e => toggleFavorito(current, e)}
                   title="Guardar en Favoritas"
                 >
-                  {favoritos.includes(current) ? '❤️' : '🤍'}
+                  <Heart
+                    size={18}
+                    strokeWidth={2}
+                    fill={esFavActual ? '#1db954' : 'none'}
+                    color={esFavActual ? '#1db954' : 'currentColor'}
+                  />
                 </button>
               )}
             </div>
@@ -2127,35 +2413,41 @@ export default function App() {
                   onClick={() => setIsShuffle(!isShuffle)}
                   title="Aleatorio (Mi Música)"
                 >
-                  🔀
+                  <Shuffle size={16} strokeWidth={2} />
                 </button>
                 <button
                   className="bottom-ctrl-btn"
                   onClick={manejarAnteriorGlobal}
                   title="Anterior"
                 >
-                  ⏮
+                  <SkipBack size={19} strokeWidth={2.2} />
                 </button>
                 <button
                   className="bottom-play-main-btn"
                   onClick={manejarPlayPausaGlobal}
                   title={enPausa ? 'Reproducir' : 'Pausar'}
                 >
-                  {spotifyCargandoAudio && fuente === 'spotify' ? '⏳' : enPausa ? '▶' : '⏸'}
+                  {spotifyCargandoAudio && fuente === 'spotify' ? (
+                    <Loader2 size={18} className="icon-spin" />
+                  ) : enPausa ? (
+                    <Play size={18} strokeWidth={2.5} fill="currentColor" />
+                  ) : (
+                    <Pause size={18} strokeWidth={2.5} fill="currentColor" />
+                  )}
                 </button>
                 <button
                   className="bottom-ctrl-btn"
                   onClick={manejarSiguienteGlobal}
                   title="Siguiente"
                 >
-                  ⏭
+                  <SkipForward size={19} strokeWidth={2.2} />
                 </button>
                 <button
                   className={`bottom-ctrl-btn small ${isRepeat ? 'active' : ''}`}
                   onClick={() => setIsRepeat(!isRepeat)}
                   title="Repetir canción"
                 >
-                  🔁
+                  <Repeat size={16} strokeWidth={2} />
                 </button>
               </div>
 
@@ -2181,7 +2473,13 @@ export default function App() {
                 onClick={() => aplicarVolumenGlobal(volumen, !silenciado)}
                 title={silenciado ? 'Activar sonido' : 'Silenciar'}
               >
-                {silenciado || volumen === 0 ? '🔇' : volumen < 50 ? '🔉' : '🔊'}
+                {silenciado || volumen === 0 ? (
+                  <VolumeX size={18} strokeWidth={2} />
+                ) : volumen < 50 ? (
+                  <Volume1 size={18} strokeWidth={2} />
+                ) : (
+                  <Volume2 size={18} strokeWidth={2} />
+                )}
               </button>
               <input
                 type="range"
