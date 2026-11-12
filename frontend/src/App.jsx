@@ -100,9 +100,16 @@ export default function App() {
   const spotifyColaRef = useRef([]);
   const spotifyIndiceRef = useRef(0);
 
-  // Búsqueda general
+  // Búsqueda general y estado de la Barra de Reproducción Inferior Fija
   const [search, setSearch] = useState('');
   const [buscando, setBuscando] = useState(false);
+  const [mp3Pausado, setMp3Pausado] = useState(false);
+  const [mp3TiempoSeg, setMp3TiempoSeg] = useState(0);
+  const [mp3DuracionSeg, setMp3DuracionSeg] = useState(0);
+  const [ytTiempoSeg, setYtTiempoSeg] = useState(0);
+  const [ytDuracionSeg, setYtDuracionSeg] = useState(0);
+  const [volumen, setVolumen] = useState(85);
+  const [silenciado, setSilenciado] = useState(false);
 
   // Favoritos
   const [favoritos, setFavoritos] = useState(() => {
@@ -116,6 +123,24 @@ export default function App() {
   const audioRef = useRef(null);
   const videoNubeRef = useRef(null);
   const ytPlayerRef = useRef(null);
+
+  const aplicarVolumenGlobal = (nuevoVol, mute = false) => {
+    const vEfectivo = mute ? 0 : nuevoVol;
+    setVolumen(nuevoVol);
+    setSilenciado(mute);
+    try {
+      if (audioRef.current) audioRef.current.volume = vEfectivo / 100;
+    } catch {}
+    try {
+      if (videoNubeRef.current) videoNubeRef.current.volume = vEfectivo / 100;
+    } catch {}
+    try {
+      spotifyBgPlayerRef.current?.setVolume?.(vEfectivo);
+    } catch {}
+    try {
+      ytPlayerRef.current?.setVolume?.(vEfectivo);
+    } catch {}
+  };
 
   const nombre = url => {
     if (titulosMP3 && titulosMP3[url]) return titulosMP3[url];
@@ -166,8 +191,11 @@ export default function App() {
   const reproducirMP3 = url => {
     try { spotifyPlayerRef.current?.pause(); } catch {}
     try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
+    try { ytPlayerRef.current?.pauseVideo?.(); } catch {}
     setSpotifyPausadoMulti(true);
+    setSpotifyTrackActual(null);
     setCurrent(url);
+    setMp3Pausado(false);
     setCurrentVideo(null);
     setCurrentVideoNube(null);
   };
@@ -175,7 +203,10 @@ export default function App() {
   const reproducirVideoNube = video => {
     try { spotifyPlayerRef.current?.pause(); } catch {}
     try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
+    try { ytPlayerRef.current?.pauseVideo?.(); } catch {}
     setSpotifyPausadoMulti(true);
+    setSpotifyTrackActual(null);
+    setCurrent('');
     setCurrentVideoNube(video);
     setCurrentVideo(null);
     if (audioRef.current) audioRef.current.pause();
@@ -200,9 +231,12 @@ export default function App() {
     try { spotifyPlayerRef.current?.pause(); } catch {}
     try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
     setSpotifyPausadoMulti(true);
+    setSpotifyTrackActual(null);
+    setCurrent('');
     setCurrentVideo(videoId);
     setYtIndex(index);
     setYtPausado(false);
+    setYtTiempoSeg(0);
     setCurrentVideoNube(null);
     if (audioRef.current) audioRef.current.pause();
   };
@@ -450,9 +484,18 @@ export default function App() {
           rel: 0
         },
         events: {
+          onReady: ev => {
+            try {
+              ev.target.setVolume(silenciado ? 0 : volumen);
+            } catch {}
+          },
           onStateChange: event => {
             if (event.data === 1) {
               setYtPausado(false);
+              try {
+                const d = event.target.getDuration?.();
+                if (d && d > 0) setYtDuracionSeg(Math.floor(d));
+              } catch {}
             } else if (event.data === 2) {
               setYtPausado(true);
             } else if (event.data === 0) {
@@ -478,6 +521,20 @@ export default function App() {
       crearOActualizarYTPlayer();
     }
   }, [currentVideo, modoRadioYT, tab]);
+
+  // Avance de la barra de progreso de YouTube para el reproductor inferior fijo
+  useEffect(() => {
+    if (!currentVideo || ytPausado) return;
+    const t = setInterval(() => {
+      try {
+        const cur = ytPlayerRef.current?.getCurrentTime?.();
+        const dur = ytPlayerRef.current?.getDuration?.();
+        if (typeof cur === 'number' && !Number.isNaN(cur)) setYtTiempoSeg(Math.floor(cur));
+        if (typeof dur === 'number' && !Number.isNaN(dur) && dur > 0) setYtDuracionSeg(Math.floor(dur));
+      } catch {}
+    }, 500);
+    return () => clearInterval(t);
+  }, [currentVideo, ytPausado]);
 
   // Búsqueda en vivo en YouTube: actualiza sugerencias mientras escribes
   useEffect(() => {
@@ -586,6 +643,8 @@ export default function App() {
     if (!track) return;
     if (audioRef.current) audioRef.current.pause();
     try { spotifyPlayerRef.current?.pause(); } catch {}
+    try { ytPlayerRef.current?.pauseVideo?.(); } catch {}
+    setCurrent('');
     setCurrentVideo(null);
     setCurrentVideoNube(null);
     setSpotifyEmbedUrl('');
@@ -619,6 +678,7 @@ export default function App() {
 
       if (spotifyBgPlayerRef.current && typeof spotifyBgPlayerRef.current.loadVideoById === 'function') {
         spotifyBgPlayerRef.current.loadVideoById(videoId);
+        try { spotifyBgPlayerRef.current.setVolume(silenciado ? 0 : volumen); } catch {}
         spotifyBgPlayerRef.current.playVideo();
       } else if (window.YT && window.YT.Player) {
         spotifyBgPlayerRef.current = new window.YT.Player('spotify-hidden-audio-engine', {
@@ -634,7 +694,7 @@ export default function App() {
           events: {
             onReady: ev => {
               try {
-                ev.target.setVolume(100);
+                ev.target.setVolume(silenciado ? 0 : volumen);
                 ev.target.playVideo();
               } catch {}
             },
@@ -862,115 +922,193 @@ export default function App() {
   };
 
   const videosFiltrados = carpetaSeleccionada
-    ? videosNube.filter(v => v.carpeta === carpetaSeleccionada)
+    ? videosNube.filter(
+        v =>
+          v.carpeta === carpetaSeleccionada &&
+          (!filtro.trim() || v.titulo.toLowerCase().includes(filtro.toLowerCase()))
+      )
     : [];
 
-  // El reproductor flotante de MP3 SOLO debe mostrarse cuando estás escuchando música de la nube o favoritas
-  const mostrarReproductorMP3 = Boolean(current) && (tab === 'cloud' || tab === 'favorites');
+  // Buscador Único Inteligente: adapta su valor y acción según la pestaña activa
+  const valorBuscadorActivo =
+    tab === 'youtube' ? ytSearchQuery : tab === 'spotify' ? spotifySearchQuery : filtro;
+
+  const placeholderBuscadorActivo =
+    tab === 'youtube'
+      ? '🔍 Buscar en YouTube en vivo o pegar enlace...'
+      : tab === 'spotify'
+        ? '🔍 Buscar canción, artista o grupo en Spotify...'
+        : tab === 'videos_nube'
+          ? '🔍 Filtrar videos por título...'
+          : '🔍 Filtrar canciones MP3 por nombre o artista...';
+
+  const manejarCambioBuscadorUnico = val => {
+    if (tab === 'youtube') {
+      setYtSearchQuery(val);
+      if (!val.trim()) cargarSugerenciasYouTube();
+    } else if (tab === 'spotify') {
+      setSpotifySearchQuery(val);
+      if (val.trim() && spotifySubTab !== 'buscar') {
+        setSpotifySubTab('buscar');
+      } else if (!val.trim() && spotifySubTab === 'buscar') {
+        setSpotifySubTab('recomendadas');
+      }
+    } else {
+      setFiltro(val);
+      setSearch(val);
+    }
+  };
+
+  const limpiarBuscadorUnico = () => {
+    if (tab === 'youtube') {
+      setYtSearchQuery('');
+      cargarSugerenciasYouTube();
+    } else if (tab === 'spotify') {
+      setSpotifySearchQuery('');
+      setSpotifySearchResults(null);
+      setSpotifySubTab('recomendadas');
+    } else {
+      setFiltro('');
+      setSearch('');
+    }
+  };
+
+  const ejecutarBuscadorUnico = async () => {
+    if (tab === 'youtube') {
+      const q = ytSearchQuery.trim();
+      if (!q) return;
+      const directId = extraerIdYouTube(q);
+      if (directId) {
+        reproducirYouTube(directId);
+        return;
+      }
+      setYtBuscando(true);
+      try {
+        const r = await axios.get(`${API}/api/youtube/search`, { params: { q } });
+        if (r.data?.items) setYtVideos(r.data.items);
+      } catch (e) {
+        console.error(e);
+      }
+      setYtBuscando(false);
+    } else if (tab === 'spotify') {
+      if (spotifySearchQuery.trim()) {
+        setSpotifySubTab('buscar');
+        buscarSpotify();
+      }
+    } else if (filtro.trim()) {
+      const directId = extraerIdYouTube(filtro.trim());
+      if (directId) {
+        setTab('youtube');
+        reproducirYouTube(directId);
+      }
+    }
+  };
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1>🎵 Reproductor Multimedia</h1>
-        <div className="search-bar">
-          <input
-            placeholder="Buscar artista, canción o video..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && buscar()}
-          />
-          <button className="btn-primary" onClick={buscar} disabled={buscando}>
-            {buscando ? 'Buscando...' : '🔍 Buscar'}
-          </button>
+    <div className="app-layout">
+      {/* 1. MENÚ LATERAL IZQUIERDO FIJO (220px) */}
+      <aside className="app-sidebar">
+        <div className="sidebar-brand">
+          <span className="sidebar-brand-icon">🎵</span>
+          <h1>Reproductor Multimedia</h1>
         </div>
 
-        <nav className="tab-nav">
+        <nav className="sidebar-nav">
           <button
-            className={`tab-btn ${tab === 'cloud' ? 'active' : ''}`}
+            className={`sidebar-tab-btn ${tab === 'cloud' ? 'active' : ''}`}
             onClick={() => cambiarPestana('cloud')}
           >
-            ☁️ Mi Música ({mp3Tracks.length})
+            <span className="sidebar-tab-icon">☁️</span>
+            <span className="sidebar-tab-label">Mi Música</span>
+            <span className="sidebar-tab-count">{mp3Tracks.length}</span>
           </button>
+
           <button
-            className={`tab-btn ${tab === 'videos_nube' ? 'active' : ''}`}
+            className={`sidebar-tab-btn ${tab === 'videos_nube' ? 'active' : ''}`}
             onClick={() => cambiarPestana('videos_nube')}
           >
-            🎬 Mis Videos ({totalVideosNube || videosNube.length})
+            <span className="sidebar-tab-icon">🎬</span>
+            <span className="sidebar-tab-label">Mis Videos</span>
+            <span className="sidebar-tab-count">{totalVideosNube || videosNube.length}</span>
           </button>
+
           <button
-            className={`tab-btn ${tab === 'favorites' ? 'active' : ''}`}
+            className={`sidebar-tab-btn ${tab === 'favorites' ? 'active' : ''}`}
             onClick={() => cambiarPestana('favorites')}
           >
-            ❤️ Favoritas ({favoritos.length})
+            <span className="sidebar-tab-icon">❤️</span>
+            <span className="sidebar-tab-label">Favoritas</span>
+            <span className="sidebar-tab-count">{favoritos.length}</span>
           </button>
+
           <button
-            className={`tab-btn ${tab === 'youtube' ? 'active' : ''}`}
+            className={`sidebar-tab-btn ${tab === 'youtube' ? 'active' : ''}`}
             onClick={() => cambiarPestana('youtube')}
           >
-            ▶ YouTube {ytVideos.length > 0 && `(${ytVideos.length})`}
+            <span className="sidebar-tab-icon">▶</span>
+            <span className="sidebar-tab-label">YouTube</span>
+            {ytVideos.length > 0 && <span className="sidebar-tab-count">{ytVideos.length}</span>}
           </button>
+
           <button
-            className={`tab-btn ${tab === 'spotify' ? 'active' : ''}`}
+            className={`sidebar-tab-btn ${tab === 'spotify' ? 'active' : ''}`}
             onClick={() => cambiarPestana('spotify')}
           >
-            🟢 Spotify
+            <span className="sidebar-tab-icon">🟢</span>
+            <span className="sidebar-tab-label">Spotify</span>
+            <span className="sidebar-tab-count">PRO</span>
           </button>
         </nav>
-      </header>
+      </aside>
 
-      {/* REPRODUCTOR DE MP3 FLOTANTE (Solo se muestra en Mi Música o Favoritas para no estorbar en YouTube o Videos) */}
-      {mostrarReproductorMP3 && (
-        <div className="floating-player">
-          <div className="player-track-info">
-            <span className="player-icon">🎵</span>
-            <div className="player-text">
-              <span className="player-status">Audio en reproducción:</span>
-              <strong>{nombre(current)}</strong>
-            </div>
+      {/* ÁREA PRINCIPAL DERECHA */}
+      <main className="app-main-area">
+        {/* 3. BUSCADOR ÚNICO SUPERIOR (Filtra o busca según la pestaña activa) */}
+        <header className="top-search-header">
+          <div className="unified-search-box">
+            <input
+              type="text"
+              placeholder={placeholderBuscadorActivo}
+              value={valorBuscadorActivo}
+              onChange={e => manejarCambioBuscadorUnico(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && ejecutarBuscadorUnico()}
+            />
+            {valorBuscadorActivo && (
+              <button
+                className="unified-search-clear"
+                onClick={limpiarBuscadorUnico}
+                title="Limpiar búsqueda"
+              >
+                ✕
+              </button>
+            )}
             <button
-              className="btn-heart"
-              onClick={e => toggleFavorito(current, e)}
-              title="Guardar en favoritos"
+              className="btn-primary unified-search-btn"
+              onClick={ejecutarBuscadorUnico}
+              disabled={buscando || ytBuscando || spotifyBuscando}
             >
-              {favoritos.includes(current) ? '❤️' : '🤍'}
-            </button>
-            <button
-              className="btn-close-player"
-              onClick={cerrarReproductorMP3}
-              title="Cerrar reproductor"
-            >
-              ✕
+              {buscando || ytBuscando || spotifyBuscando ? '⏳ Buscando...' : '🔍 Buscar'}
             </button>
           </div>
+        </header>
 
-          <audio
-            ref={audioRef}
-            controls
-            autoPlay
-            src={current}
-            onEnded={() => moverAudio(1)}
-          />
-
-          <div className="player-controls">
-            <button className="btn-control" onClick={() => moverAudio(-1)}>⏮ Anterior</button>
-            <button className="btn-control" onClick={() => moverAudio(1)}>Siguiente ⏭</button>
-            <button
-              className={`btn-control ${isShuffle ? 'active-toggle' : ''}`}
-              onClick={() => setIsShuffle(!isShuffle)}
-              title="Reproducción aleatoria"
-            >
-              🔀 {isShuffle ? 'Aleatorio ON' : 'Aleatorio'}
-            </button>
-            <button
-              className={`btn-control ${isRepeat ? 'active-toggle' : ''}`}
-              onClick={() => setIsRepeat(!isRepeat)}
-              title="Repetir canción"
-            >
-              🔁 {isRepeat ? 'Repetir ON' : 'Repetir'}
-            </button>
-          </div>
-        </div>
-      )}
+        {/* Audio HTML5 oculto montado permanentemente para la Barra de Reproducción Inferior */}
+        <audio
+          ref={audioRef}
+          src={current || undefined}
+          autoPlay
+          onPlay={() => setMp3Pausado(false)}
+          onPause={() => setMp3Pausado(true)}
+          onTimeUpdate={e => setMp3TiempoSeg(Math.floor(e.currentTarget.currentTime || 0))}
+          onLoadedMetadata={e => {
+            setMp3DuracionSeg(Math.floor(e.currentTarget.duration || 0));
+            try {
+              e.currentTarget.volume = (silenciado ? 0 : volumen) / 100;
+            } catch {}
+          }}
+          onEnded={() => moverAudio(1)}
+          style={{ display: 'none' }}
+        />
 
       {/* PESTAÑA: AUDIOS NUBE O FAVORITAS */}
       {(tab === 'cloud' || tab === 'favorites') && (
@@ -989,12 +1127,6 @@ export default function App() {
                 </button>
               )}
             </div>
-            <input
-              className="filtro-input"
-              placeholder="Filtrar por nombre o artista..."
-              value={filtro}
-              onChange={e => setFiltro(e.target.value)}
-            />
           </div>
 
           {/* Selector de Géneros / Carpetas (solo en Mi Música) */}
@@ -1357,40 +1489,12 @@ export default function App() {
         const videoActivoObj = ytVideos.find(v => v.id.videoId === currentVideo) || ytVideos[0];
         return (
           <section className="section-content yt-watch-section">
-            {/* Barra superior estilo YouTube con buscador en vivo */}
+            {/* Barra superior de YouTube (el buscador está unificado arriba) */}
             <div className="yt-top-bar">
               <div className="yt-brand-logo">
                 <span className="yt-logo-icon">▶</span>
                 <span className="yt-logo-text">YouTube</span>
                 <span className="yt-logo-country">MX</span>
-              </div>
-
-              <div className="yt-live-search-box">
-                <input
-                  type="text"
-                  placeholder="Buscar en YouTube (escribe y saldrán las sugerencias al instante)..."
-                  value={ytSearchQuery}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setYtSearchQuery(val);
-                    if (!val.trim()) cargarSugerenciasYouTube();
-                  }}
-                />
-                {ytSearchQuery && (
-                  <button
-                    className="yt-search-clear"
-                    onClick={() => {
-                      setYtSearchQuery('');
-                      cargarSugerenciasYouTube();
-                    }}
-                    title="Limpiar búsqueda"
-                  >
-                    ✕
-                  </button>
-                )}
-                <button className="yt-search-btn" title="Buscar">
-                  {ytBuscando ? '⏳' : '🔍'}
-                </button>
               </div>
 
               {/* Botones de Modo Operativo: Desbloquear, Crear Pase Temporal y volver a Tapar Pantalla */}
@@ -1624,7 +1728,7 @@ export default function App() {
       {/* PESTAÑA: SPOTIFY (MODO PREMIUM MULTIUSUARIO ACTIVO PARA TODOS) */}
       {tab === 'spotify' && (
         <section className="section-content spotify-main-section">
-          {/* Header Superior Oficial de Spotify */}
+          {/* Header Superior Oficial de Spotify (el buscador está unificado arriba) */}
           <div className="spotify-top-header">
             <div className="spotify-brand">
               <svg className="spotify-logo-svg" viewBox="0 0 24 24" width="38" height="38" fill="#1DB954">
@@ -1662,43 +1766,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Buscador en Vivo Permanente arriba de Spotify */}
-          <div className="spotify-search-bar" style={{ marginBottom: 18 }}>
-            <input
-              placeholder="🔍 ¿Qué canción o artista quieres escuchar hoy? Escribe aquí y saldrá al instante..."
-              value={spotifySearchQuery}
-              onChange={e => {
-                setSpotifySearchQuery(e.target.value);
-                if (e.target.value.trim() && spotifySubTab !== 'buscar') {
-                  setSpotifySubTab('buscar');
-                }
-              }}
-              onKeyDown={e => e.key === 'Enter' && buscarSpotify()}
-            />
-            {spotifySearchQuery && (
-              <button
-                className="btn-spotify-logout"
-                onClick={() => {
-                  setSpotifySearchQuery('');
-                  setSpotifySearchResults(null);
-                  setSpotifySubTab('recomendadas');
-                }}
-              >
-                ✕ Limpiar
-              </button>
-            )}
-            <button
-              className="btn-spotify-small"
-              onClick={() => {
-                setSpotifySubTab('buscar');
-                buscarSpotify();
-              }}
-              disabled={spotifyBuscando}
-            >
-              {spotifyBuscando ? 'Buscando...' : 'Buscar'}
-            </button>
-          </div>
-
           {/* Subpestañas estilo Spotify */}
           <div className="spotify-nav-pills">
             <button
@@ -1721,93 +1788,8 @@ export default function App() {
             </button>
           </div>
 
-          {/* Reproductor Multiusuario de Spotify (Canciones Completas para Varios Usuarios a la vez) */}
-          {spotifyTrackActual ? (() => {
-            const dur = spotifyDuracionMs || spotifyTrackActual.duration_ms || 210000;
-            const fmt = ms => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
-            return (
-              <div
-                className="spotify-active-embed-box"
-                style={{
-                  background: 'linear-gradient(135deg,#193b27,#121212)',
-                  border: '1px solid rgba(29,185,84,0.35)',
-                  borderRadius: 14,
-                  padding: 20,
-                  display: 'flex',
-                  gap: 20,
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  marginBottom: 22
-                }}
-              >
-                <img
-                  src={spotifyTrackActual.album?.images?.[0]?.url || spotifyTrackActual.album?.images?.[2]?.url}
-                  alt={spotifyTrackActual.name}
-                  style={{ width: 135, height: 135, borderRadius: 10, objectFit: 'cover', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}
-                />
-                <div style={{ flex: 1, minWidth: 240 }}>
-                  <div style={{ fontSize: 12, color: '#1DB954', fontWeight: 700, letterSpacing: 1 }}>
-                    {spotifyCargandoAudio
-                      ? '⏳ CONECTANDO AUDIO COMPLETO...'
-                      : '🟢 REPRODUCIENDO EN SPOTIFY • MODO MULTIUSUARIO'}
-                  </div>
-                  <h2 style={{ margin: '6px 0 2px', fontSize: 24 }}>{spotifyTrackActual.name}</h2>
-                  <div style={{ color: '#b3b3b3', marginBottom: 14 }}>
-                    {spotifyTrackActual.artists?.map(a => a.name).join(', ')}
-                    {spotifyTrackActual.album?.name ? ` • ${spotifyTrackActual.album.name}` : ''}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 12, color: '#b3b3b3', width: 38 }}>{fmt(spotifyPos)}</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={dur}
-                      value={Math.min(spotifyPos, dur)}
-                      onChange={e => adelantarSpotifyMulti(Number(e.target.value))}
-                      style={{ flex: 1, accentColor: '#1DB954', cursor: 'pointer' }}
-                    />
-                    <span style={{ fontSize: 12, color: '#b3b3b3', width: 38 }}>{fmt(dur)}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 18, alignItems: 'center', marginTop: 12 }}>
-                    <button
-                      onClick={anteriorPistaSpotifyMulti}
-                      title="Canción anterior"
-                      style={{ background: 'none', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer' }}
-                    >
-                      ⏮
-                    </button>
-                    <button
-                      onClick={togglePlaySpotifyMulti}
-                      title={spotifyPausadoMulti ? 'Reproducir' : 'Pausar'}
-                      style={{
-                        width: 54,
-                        height: 54,
-                        borderRadius: '50%',
-                        border: 'none',
-                        background: '#1DB954',
-                        color: '#000',
-                        fontSize: 22,
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      {spotifyCargandoAudio ? '⏳' : spotifyPausadoMulti ? '▶' : '⏸'}
-                    </button>
-                    <button
-                      onClick={siguientePistaSpotifyMulti}
-                      title="Siguiente canción"
-                      style={{ background: 'none', border: 'none', color: '#fff', fontSize: 26, cursor: 'pointer' }}
-                    >
-                      ⏭
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })() : spotifyEmbedUrl && (
+          {/* Reproductor embebido opcional si el usuario pega un enlace directo */}
+          {spotifyEmbedUrl && (
             <div className="spotify-active-embed-box">
               <iframe
                 src={spotifyEmbedUrl}
@@ -1931,7 +1913,7 @@ export default function App() {
             <div className="spotify-content-block">
               {!spotifySearchQuery.trim() ? (
                 <p className="empty-notice">
-                  Escribe el nombre de cualquier canción, artista o grupo en el buscador de arriba para escucharla completa al instante.
+                  Escribe el nombre de cualquier canción, artista o grupo en el buscador superior para escucharla completa al instante.
                 </p>
               ) : spotifyBuscando && !spotifySearchResults ? (
                 <p className="empty-notice">Buscando "{spotifySearchQuery}" en el catálogo de Spotify...</p>
@@ -2007,6 +1989,214 @@ export default function App() {
           )}
         </section>
       )}
+      </main>
+
+      {/* 2. BARRA DE REPRODUCCIÓN INFERIOR FIJA (Siempre visible en todas las pestañas) */}
+      {(() => {
+        const fmtSeg = seg => {
+          const s = Math.max(0, Math.floor(Number(seg) || 0));
+          return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+        };
+
+        const videoYT = ytVideos.find(v => v.id.videoId === currentVideo);
+
+        // Detectar fuente activa
+        let tituloBarra = 'Selecciona una canción o video';
+        let subtituloBarra = 'Listo para reproducir';
+        let miniaturaBarra = null;
+        let iconoBarra = '🎵';
+        let enPausa = true;
+        let posSeg = 0;
+        let durSeg = 0;
+        let fuente = 'ninguna';
+
+        if (spotifyTrackActual) {
+          fuente = 'spotify';
+          tituloBarra = spotifyTrackActual.name;
+          subtituloBarra = `${spotifyTrackActual.artists?.map(a => a.name).join(', ') || 'Spotify'} • 🟢 Spotify`;
+          miniaturaBarra = spotifyTrackActual.album?.images?.[2]?.url || spotifyTrackActual.album?.images?.[0]?.url;
+          iconoBarra = '🟢';
+          enPausa = spotifyPausadoMulti;
+          posSeg = Math.floor((spotifyPos || 0) / 1000);
+          durSeg = Math.floor((spotifyDuracionMs || spotifyTrackActual.duration_ms || 210000) / 1000);
+        } else if (current) {
+          fuente = 'mp3';
+          tituloBarra = nombre(current);
+          subtituloBarra = '☁️ Mi Música en la Nube';
+          iconoBarra = '🎵';
+          enPausa = mp3Pausado;
+          posSeg = mp3TiempoSeg;
+          durSeg = mp3DuracionSeg;
+        } else if (currentVideo) {
+          fuente = 'youtube';
+          tituloBarra = videoYT?.snippet?.title || 'Reproduciendo en YouTube';
+          subtituloBarra = `${videoYT?.snippet?.channelTitle || 'YouTube'} • ▶ YouTube`;
+          miniaturaBarra = videoYT?.snippet?.thumbnails?.default?.url;
+          iconoBarra = '▶';
+          enPausa = ytPausado;
+          posSeg = ytTiempoSeg;
+          durSeg = ytDuracionSeg;
+        } else if (currentVideoNube) {
+          fuente = 'video_nube';
+          tituloBarra = currentVideoNube.titulo;
+          subtituloBarra = `🎬 Mis Videos • 📁 ${currentVideoNube.carpeta}`;
+          iconoBarra = '🎬';
+          enPausa = false;
+        }
+
+        const manejarPlayPausaGlobal = () => {
+          if (fuente === 'spotify') {
+            togglePlaySpotifyMulti();
+          } else if (fuente === 'mp3') {
+            if (!audioRef.current) return;
+            if (audioRef.current.paused) {
+              audioRef.current.play();
+              setMp3Pausado(false);
+            } else {
+              audioRef.current.pause();
+              setMp3Pausado(true);
+            }
+          } else if (fuente === 'youtube') {
+            togglePlayYouTube();
+          } else if (audiosVisibles.length > 0) {
+            reproducirMP3(audiosVisibles[0]);
+          } else if (spotifyPistasLista.length > 0) {
+            reproducirPistaSpotifyMulti(spotifyPistasLista[0], spotifyPistasLista, 0);
+          }
+        };
+
+        const manejarAnteriorGlobal = () => {
+          if (fuente === 'spotify') anteriorPistaSpotifyMulti();
+          else if (fuente === 'youtube') anteriorYouTube();
+          else moverAudio(-1);
+        };
+
+        const manejarSiguienteGlobal = () => {
+          if (fuente === 'spotify') siguientePistaSpotifyMulti();
+          else if (fuente === 'youtube') siguienteYouTube();
+          else moverAudio(1);
+        };
+
+        const manejarSeekGlobal = nuevoSeg => {
+          if (fuente === 'spotify') {
+            adelantarSpotifyMulti(nuevoSeg * 1000);
+          } else if (fuente === 'mp3' && audioRef.current) {
+            audioRef.current.currentTime = nuevoSeg;
+            setMp3TiempoSeg(nuevoSeg);
+          } else if (fuente === 'youtube' && ytPlayerRef.current) {
+            try {
+              ytPlayerRef.current.seekTo?.(nuevoSeg, true);
+              setYtTiempoSeg(nuevoSeg);
+            } catch {}
+          }
+        };
+
+        return (
+          <footer className="bottom-player-bar">
+            {/* Izquierda: Canción / Video Actual */}
+            <div className="bottom-player-left">
+              {miniaturaBarra ? (
+                <img src={miniaturaBarra} alt={tituloBarra} className="bottom-player-thumb" />
+              ) : (
+                <div className="bottom-player-icon-box">{iconoBarra}</div>
+              )}
+              <div className="bottom-player-meta">
+                <div className="bottom-player-title" title={tituloBarra}>
+                  {tituloBarra}
+                </div>
+                <div className="bottom-player-sub" title={subtituloBarra}>
+                  {subtituloBarra}
+                </div>
+              </div>
+              {fuente === 'mp3' && current && (
+                <button
+                  className="btn-heart"
+                  onClick={e => toggleFavorito(current, e)}
+                  title="Guardar en Favoritas"
+                >
+                  {favoritos.includes(current) ? '❤️' : '🤍'}
+                </button>
+              )}
+            </div>
+
+            {/* Centro: Botones Anterior, Play/Pausa, Siguiente + Barra de Progreso */}
+            <div className="bottom-player-center">
+              <div className="bottom-player-buttons">
+                <button
+                  className={`bottom-ctrl-btn small ${isShuffle ? 'active' : ''}`}
+                  onClick={() => setIsShuffle(!isShuffle)}
+                  title="Aleatorio (Mi Música)"
+                >
+                  🔀
+                </button>
+                <button
+                  className="bottom-ctrl-btn"
+                  onClick={manejarAnteriorGlobal}
+                  title="Anterior"
+                >
+                  ⏮
+                </button>
+                <button
+                  className="bottom-play-main-btn"
+                  onClick={manejarPlayPausaGlobal}
+                  title={enPausa ? 'Reproducir' : 'Pausar'}
+                >
+                  {spotifyCargandoAudio && fuente === 'spotify' ? '⏳' : enPausa ? '▶' : '⏸'}
+                </button>
+                <button
+                  className="bottom-ctrl-btn"
+                  onClick={manejarSiguienteGlobal}
+                  title="Siguiente"
+                >
+                  ⏭
+                </button>
+                <button
+                  className={`bottom-ctrl-btn small ${isRepeat ? 'active' : ''}`}
+                  onClick={() => setIsRepeat(!isRepeat)}
+                  title="Repetir canción"
+                >
+                  🔁
+                </button>
+              </div>
+
+              <div className="bottom-progress-row">
+                <span className="bottom-time-label">{fmtSeg(posSeg)}</span>
+                <input
+                  type="range"
+                  className="bottom-progress-slider"
+                  min={0}
+                  max={durSeg > 0 ? durSeg : 100}
+                  value={durSeg > 0 ? Math.min(posSeg, durSeg) : 0}
+                  onChange={e => manejarSeekGlobal(Number(e.target.value))}
+                  disabled={durSeg <= 0}
+                />
+                <span className="bottom-time-label">{fmtSeg(durSeg)}</span>
+              </div>
+            </div>
+
+            {/* Derecha: Control de Volumen */}
+            <div className="bottom-player-right">
+              <button
+                className="bottom-vol-btn"
+                onClick={() => aplicarVolumenGlobal(volumen, !silenciado)}
+                title={silenciado ? 'Activar sonido' : 'Silenciar'}
+              >
+                {silenciado || volumen === 0 ? '🔇' : volumen < 50 ? '🔉' : '🔊'}
+              </button>
+              <input
+                type="range"
+                className="bottom-vol-slider"
+                min={0}
+                max={100}
+                value={silenciado ? 0 : volumen}
+                onChange={e => aplicarVolumenGlobal(Number(e.target.value), false)}
+                title={`Volumen: ${silenciado ? 0 : volumen}%`}
+              />
+              <span className="bottom-vol-pct">{silenciado ? 0 : volumen}%</span>
+            </div>
+          </footer>
+        );
+      })()}
 
       {/* Motor invisible de audio para reproducción simultánea multiusuario de Spotify */}
       <div
