@@ -172,7 +172,6 @@ export default function App() {
   const ytEmbedWrapRef = useRef(null);
   const cursorTimerRef = useRef(null);
   const ultimaPosMouseRef = useRef({ x: -1, y: -1 });
-  const silentAudioRef = useRef(null);
   const usuarioDioPausaManualRef = useRef(false);
   const fuePausadoPorSegundoPlanoRef = useRef(false);
   const [cursorVideoOculto, setCursorVideoOculto] = useState(false);
@@ -180,27 +179,6 @@ export default function App() {
   const [nubeYtPausado, setNubeYtPausado] = useState(false);
   const [nubeYtTiempoSeg, setNubeYtTiempoSeg] = useState(0);
   const [nubeYtDuracionSeg, setNubeYtDuracionSeg] = useState(0);
-
-  const SILENT_AUDIO_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-
-  const activarAudioKeepAlive = () => {
-    try {
-      if (silentAudioRef.current) {
-        if (!silentAudioRef.current.src || !silentAudioRef.current.src.startsWith('data:audio/wav')) {
-          silentAudioRef.current.src = SILENT_AUDIO_WAV;
-          silentAudioRef.current.loop = true;
-          silentAudioRef.current.volume = 0.01;
-        }
-        silentAudioRef.current.play().catch(() => {});
-      }
-    } catch {}
-  };
-
-  const desactivarAudioKeepAlive = () => {
-    try {
-      silentAudioRef.current?.pause();
-    } catch {}
-  };
 
   const formatearSegundosVideo = seg => {
     const s = Math.max(0, Math.floor(Number(seg) || 0));
@@ -415,7 +393,6 @@ export default function App() {
   const reproducirMP3 = url => {
     usuarioDioPausaManualRef.current = false;
     fuePausadoPorSegundoPlanoRef.current = false;
-    desactivarAudioKeepAlive();
     try { spotifyPlayerRef.current?.pause(); } catch {}
     try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
     try { ytPlayerRef.current?.pauseVideo?.(); } catch {}
@@ -443,11 +420,6 @@ export default function App() {
     setCurrentVideoNube(video);
     setCurrentVideo(null);
     if (audioRef.current) audioRef.current.pause();
-    if (video.tipo === 'youtube') {
-      activarAudioKeepAlive();
-    } else {
-      desactivarAudioKeepAlive();
-    }
   };
 
   const cerrarReproductorMP3 = () => {
@@ -466,7 +438,6 @@ export default function App() {
   const reproducirYouTube = (videoId, index = 0) => {
     usuarioDioPausaManualRef.current = false;
     fuePausadoPorSegundoPlanoRef.current = false;
-    activarAudioKeepAlive();
     try { spotifyPlayerRef.current?.pause(); } catch {}
     try { spotifyBgPlayerRef.current?.pauseVideo?.(); } catch {}
     try { nubeYtPlayerRef.current?.pauseVideo?.(); } catch {}
@@ -489,14 +460,12 @@ export default function App() {
         fuePausadoPorSegundoPlanoRef.current = false;
         ytPlayerRef.current.playVideo?.();
         setYtPausado(false);
-        activarAudioKeepAlive();
         try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; } catch {}
       } else {
         usuarioDioPausaManualRef.current = true;
         fuePausadoPorSegundoPlanoRef.current = false;
         ytPlayerRef.current.pauseVideo?.();
         setYtPausado(true);
-        desactivarAudioKeepAlive();
         try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; } catch {}
       }
     } catch {}
@@ -510,14 +479,12 @@ export default function App() {
         fuePausadoPorSegundoPlanoRef.current = false;
         nubeYtPlayerRef.current.playVideo?.();
         setNubeYtPausado(false);
-        activarAudioKeepAlive();
         try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; } catch {}
       } else {
         usuarioDioPausaManualRef.current = true;
         fuePausadoPorSegundoPlanoRef.current = false;
         nubeYtPlayerRef.current.pauseVideo?.();
         setNubeYtPausado(true);
-        desactivarAudioKeepAlive();
         try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; } catch {}
       }
     } catch {}
@@ -575,7 +542,6 @@ export default function App() {
           try {
             spotifyBgPlayerRef.current?.playVideo?.();
             setSpotifyPausadoMulti(false);
-            activarAudioKeepAlive();
           } catch {}
         } else if (current && audioRef.current) {
           try {
@@ -586,13 +552,11 @@ export default function App() {
           try {
             ytPlayerRef.current?.playVideo?.();
             setYtPausado(false);
-            activarAudioKeepAlive();
           } catch {}
         } else if (currentVideoNube?.tipo === 'youtube') {
           try {
             nubeYtPlayerRef.current?.playVideo?.();
             setNubeYtPausado(false);
-            activarAudioKeepAlive();
           } catch {}
         }
         try { navigator.mediaSession.playbackState = 'playing'; } catch {}
@@ -606,7 +570,6 @@ export default function App() {
           try {
             spotifyBgPlayerRef.current?.pauseVideo?.();
             setSpotifyPausadoMulti(true);
-            desactivarAudioKeepAlive();
           } catch {}
         } else if (current && audioRef.current) {
           try {
@@ -617,13 +580,11 @@ export default function App() {
           try {
             ytPlayerRef.current?.pauseVideo?.();
             setYtPausado(true);
-            desactivarAudioKeepAlive();
           } catch {}
         } else if (currentVideoNube?.tipo === 'youtube') {
           try {
             nubeYtPlayerRef.current?.pauseVideo?.();
             setNubeYtPausado(true);
-            desactivarAudioKeepAlive();
           } catch {}
         }
         try { navigator.mediaSession.playbackState = 'paused'; } catch {}
@@ -655,45 +616,66 @@ export default function App() {
 
   // Auto-reanudación inteligente al volver a la app o desbloquear en móvil
   useEffect(() => {
+    let timerReanudar = null;
+
+    const intentarReanudar = () => {
+      if (usuarioDioPausaManualRef.current) return;
+      fuePausadoPorSegundoPlanoRef.current = false;
+      if (spotifyTrackActual && spotifyBgPlayerRef.current) {
+        try {
+          spotifyBgPlayerRef.current.playVideo?.();
+          setSpotifyPausadoMulti(false);
+        } catch {}
+      } else if (currentVideo && ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current.playVideo?.();
+          setYtPausado(false);
+        } catch {}
+      } else if (currentVideoNube?.tipo === 'youtube' && nubeYtPlayerRef.current) {
+        try {
+          nubeYtPlayerRef.current.playVideo?.();
+          setNubeYtPausado(false);
+        } catch {}
+      }
+    };
+
+    const alPrimerToque = () => {
+      window.removeEventListener('pointerdown', alPrimerToque);
+      window.removeEventListener('touchstart', alPrimerToque);
+      if (fuePausadoPorSegundoPlanoRef.current && !usuarioDioPausaManualRef.current) {
+        intentarReanudar();
+      }
+    };
+
     const alCambiarVisibilidad = () => {
       if (document.visibilityState === 'visible') {
-        // Al regresar a la pestaña o app, si se había pausado por minimizar:
         if (fuePausadoPorSegundoPlanoRef.current && !usuarioDioPausaManualRef.current) {
-          fuePausadoPorSegundoPlanoRef.current = false;
-          if (spotifyTrackActual && spotifyBgPlayerRef.current) {
-            try {
-              spotifyBgPlayerRef.current.playVideo?.();
-              setSpotifyPausadoMulti(false);
-              activarAudioKeepAlive();
-            } catch {}
-          } else if (currentVideo && ytPlayerRef.current) {
-            try {
-              ytPlayerRef.current.playVideo?.();
-              setYtPausado(false);
-              activarAudioKeepAlive();
-            } catch {}
-          } else if (currentVideoNube?.tipo === 'youtube' && nubeYtPlayerRef.current) {
-            try {
-              nubeYtPlayerRef.current.playVideo?.();
-              setNubeYtPausado(false);
-              activarAudioKeepAlive();
-            } catch {}
-          }
+          // 1. Reanudar con un pequeño delay para que el renderizado del iframe se active
+          clearTimeout(timerReanudar);
+          timerReanudar = setTimeout(intentarReanudar, 180);
+
+          // 2. Si el navegador requiere interacción para desmutear/reanudar, el primer toque en pantalla lo activa
+          window.addEventListener('pointerdown', alPrimerToque, { passive: true });
+          window.addEventListener('touchstart', alPrimerToque, { passive: true });
         }
       } else if (document.visibilityState === 'hidden') {
-        // Al minimizar o apagar pantalla, registrar si estaba reproduciendo
         const estabaSonando =
           (spotifyTrackActual && !spotifyPausadoMulti) ||
           (currentVideo && !ytPausado) ||
           (currentVideoNube?.tipo === 'youtube' && !nubeYtPausado);
         if (estabaSonando && !usuarioDioPausaManualRef.current) {
           fuePausadoPorSegundoPlanoRef.current = true;
-          activarAudioKeepAlive();
         }
       }
     };
+
     document.addEventListener('visibilitychange', alCambiarVisibilidad);
-    return () => document.removeEventListener('visibilitychange', alCambiarVisibilidad);
+    return () => {
+      clearTimeout(timerReanudar);
+      window.removeEventListener('pointerdown', alPrimerToque);
+      window.removeEventListener('touchstart', alPrimerToque);
+      document.removeEventListener('visibilitychange', alCambiarVisibilidad);
+    };
   }, [
     currentVideo,
     ytPausado,
@@ -984,7 +966,6 @@ export default function App() {
               usuarioDioPausaManualRef.current = false;
               fuePausadoPorSegundoPlanoRef.current = false;
               setYtPausado(false);
-              activarAudioKeepAlive();
               try {
                 if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
                 const d = event.target.getDuration?.();
@@ -999,7 +980,6 @@ export default function App() {
                 fuePausadoPorSegundoPlanoRef.current = true;
               }
               setYtPausado(true);
-              desactivarAudioKeepAlive();
               try {
                 if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
               } catch {}
@@ -1084,7 +1064,6 @@ export default function App() {
               usuarioDioPausaManualRef.current = false;
               fuePausadoPorSegundoPlanoRef.current = false;
               setNubeYtPausado(false);
-              activarAudioKeepAlive();
               try {
                 if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
                 const d = event.target.getDuration?.();
@@ -1099,7 +1078,6 @@ export default function App() {
                 fuePausadoPorSegundoPlanoRef.current = true;
               }
               setNubeYtPausado(true);
-              desactivarAudioKeepAlive();
               try {
                 if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
               } catch {}
@@ -1326,7 +1304,6 @@ export default function App() {
                 fuePausadoPorSegundoPlanoRef.current = false;
                 setSpotifyCargandoAudio(false);
                 setSpotifyPausadoMulti(false);
-                activarAudioKeepAlive();
                 try {
                   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
                   const durSec = ev.target.getDuration?.();
@@ -1337,7 +1314,6 @@ export default function App() {
                   fuePausadoPorSegundoPlanoRef.current = true;
                 }
                 setSpotifyPausadoMulti(true);
-                desactivarAudioKeepAlive();
                 try {
                   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
                 } catch {}
@@ -1368,14 +1344,12 @@ export default function App() {
         fuePausadoPorSegundoPlanoRef.current = false;
         spotifyBgPlayerRef.current.playVideo?.();
         setSpotifyPausadoMulti(false);
-        activarAudioKeepAlive();
         try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; } catch {}
       } else {
         usuarioDioPausaManualRef.current = true;
         fuePausadoPorSegundoPlanoRef.current = false;
         spotifyBgPlayerRef.current.pauseVideo?.();
         setSpotifyPausadoMulti(true);
-        desactivarAudioKeepAlive();
         try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; } catch {}
       }
     } catch {}
@@ -3401,14 +3375,6 @@ export default function App() {
       >
         <div id="spotify-hidden-audio-engine" />
       </div>
-
-      {/* Audio nativo silencioso (Keep-Alive) para mantener activa la sesión de audio en segundo plano al minimizar */}
-      <audio
-        ref={silentAudioRef}
-        preload="auto"
-        playsInline
-        style={{ display: 'none' }}
-      />
     </div>
   );
 }
