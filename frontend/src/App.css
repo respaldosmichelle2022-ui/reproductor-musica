@@ -2669,7 +2669,7 @@ body.video-cursor-none *,
   display: none;
 }
 
-.bottom-player-mini-progress {
+.bottom-player-mobile-progress-container {
   display: none;
 }
 
@@ -2812,7 +2812,7 @@ body.video-cursor-none *,
     bottom: 56px;
     left: 0;
     right: 0;
-    height: 54px;
+    height: 58px;
     background: rgba(18, 18, 20, 0.96);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
@@ -2828,15 +2828,79 @@ body.video-cursor-none *,
     box-sizing: border-box;
   }
 
-  .bottom-player-mini-progress {
+  /* Contenedor interactivo táctil superior para correr/deslizar música con el dedo en móvil */
+  .bottom-player-mobile-progress-container {
     display: block;
+    position: absolute;
+    top: -9px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 22px;
+    z-index: 100;
+    touch-action: none;
+    cursor: pointer;
+  }
+
+  .mobile-progress-track-bg {
+    position: absolute;
+    top: 8.5px;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    pointer-events: none;
+  }
+
+  .mobile-progress-track-fill {
+    position: absolute;
+    top: 8.5px;
+    left: 0;
+    height: 5px;
+    background: #1db954;
+    border-radius: 999px;
+    pointer-events: none;
+    box-shadow: 0 0 8px rgba(29, 185, 84, 0.5);
+  }
+
+  .mobile-progress-track-thumb {
+    position: absolute;
+    top: 11px;
+    width: 16px;
+    height: 16px;
+    background: #ffffff;
+    border: 2.5px solid #1db954;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+    pointer-events: none;
+    transition: transform 0.1s ease;
+  }
+
+  .bottom-player-mobile-progress-container:active .mobile-progress-track-thumb {
+    transform: translate(-50%, -50%) scale(1.35);
+    background: #1ed760;
+  }
+
+  .bottom-player-mobile-slider {
     position: absolute;
     top: 0;
     left: 0;
-    height: 2.5px;
-    background: #1db954;
-    z-index: 10;
-    transition: width 0.3s linear;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    touch-action: none;
+    z-index: 2;
+  }
+
+  .bottom-player-sub-time {
+    color: #1ed760;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 
   .bottom-player-left {

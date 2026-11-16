@@ -3276,15 +3276,69 @@ export default function App() {
 
         const esFavActual = fuente === 'mp3' && current && favoritos.includes(current);
 
+        const manejarSeekTouchDirecto = e => {
+          if (durSeg <= 0) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const touch = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : null);
+          const clientX = touch ? touch.clientX : e.clientX;
+          if (clientX === undefined) return;
+          const clickX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+          const pct = clickX / rect.width;
+          const nuevoSeg = Math.floor(pct * durSeg);
+          manejarSeekGlobal(nuevoSeg);
+        };
+
         return (
           <footer className="bottom-player-bar">
-            {/* Barra mini de progreso superior en móvil */}
+            {/* Barra táctil interactiva superior en móvil: permite adelantar y retroceder con el dedo */}
             <div
-              className="bottom-player-mini-progress"
-              style={{
-                width: `${durSeg > 0 ? Math.min(100, Math.max(0, (posSeg / durSeg) * 100)) : 0}%`
-              }}
-            />
+              className="bottom-player-mobile-progress-container"
+              onClick={manejarSeekTouchDirecto}
+              onTouchStart={manejarSeekTouchDirecto}
+              onTouchMove={manejarSeekTouchDirecto}
+            >
+              <div className="mobile-progress-track-bg" />
+              <div
+                className="mobile-progress-track-fill"
+                style={{
+                  width: `${durSeg > 0 ? Math.min(100, Math.max(0, (posSeg / durSeg) * 100)) : 0}%`,
+                  background:
+                    fuente === 'youtube'
+                      ? '#ff0000'
+                      : fuente === 'video_nube'
+                      ? '#f59e0b'
+                      : '#1db954',
+                  boxShadow:
+                    fuente === 'youtube'
+                      ? '0 0 8px rgba(255, 0, 0, 0.5)'
+                      : fuente === 'video_nube'
+                      ? '0 0 8px rgba(245, 158, 11, 0.5)'
+                      : '0 0 8px rgba(29, 185, 84, 0.5)'
+                }}
+              />
+              <div
+                className="mobile-progress-track-thumb"
+                style={{
+                  left: `${durSeg > 0 ? Math.min(100, Math.max(0, (posSeg / durSeg) * 100)) : 0}%`,
+                  borderColor:
+                    fuente === 'youtube'
+                      ? '#ff0000'
+                      : fuente === 'video_nube'
+                      ? '#f59e0b'
+                      : '#1db954'
+                }}
+              />
+              <input
+                type="range"
+                className="bottom-player-mobile-slider"
+                min={0}
+                max={durSeg > 0 ? durSeg : 100}
+                value={durSeg > 0 ? Math.min(posSeg, durSeg) : 0}
+                onChange={e => manejarSeekGlobal(Number(e.target.value))}
+                disabled={durSeg <= 0}
+                aria-label="Progreso de reproducción"
+              />
+            </div>
             {/* Izquierda: Canción / Video Actual */}
             <div className="bottom-player-left">
               {miniaturaBarra ? (
@@ -3297,7 +3351,12 @@ export default function App() {
                   {tituloBarra}
                 </div>
                 <div className="bottom-player-sub" title={subtituloBarra}>
-                  {subtituloBarra}
+                  <span>{subtituloBarra}</span>
+                  {durSeg > 0 && (
+                    <span className="bottom-player-sub-time">
+                      {' '}• {fmtSeg(posSeg)} / {fmtSeg(durSeg)}
+                    </span>
+                  )}
                 </div>
               </div>
               {fuente === 'mp3' && current && (
