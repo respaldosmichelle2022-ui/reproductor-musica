@@ -215,6 +215,42 @@ body {
   font-size: 1.3rem;
 }
 
+.section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-shuffle-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #242424;
+  color: #d1d5db;
+  border: 1px solid #3d3d3d;
+  padding: 6px 13px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-shuffle-header:hover {
+  background: #333;
+  color: #ffffff;
+  border-color: #555;
+}
+
+.btn-shuffle-header.active {
+  background: rgba(29, 185, 84, 0.18);
+  color: #1ed760;
+  border-color: #1db954;
+  box-shadow: 0 0 12px rgba(29, 185, 84, 0.25);
+  font-weight: 700;
+}
+
 .btn-refresh-small {
   background: #2a2a2a;
   color: var(--primary-color);
@@ -1837,6 +1873,59 @@ body {
   pointer-events: none;
 }
 
+/* Botón flotante directo para Pantalla Completa en el video (Móvil y PC) */
+.btn-floating-fullscreen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(220, 20, 20, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.btn-floating-fullscreen:hover {
+  background: #ff0000;
+  border-color: #ffffff;
+  transform: scale(1.05);
+  box-shadow: 0 4px 18px rgba(255, 0, 0, 0.55);
+}
+
+.btn-floating-fullscreen.floating {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 26;
+  transition: opacity 0.25s ease, background 0.18s ease, transform 0.15s ease;
+}
+
+.btn-floating-fullscreen.floating.fade-out-idle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.btn-control.btn-fullscreen-prominent {
+  background: #ff0000 !important;
+  border-color: #ff0000 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 10px rgba(255, 0, 0, 0.35);
+}
+
+.btn-control.btn-fullscreen-prominent:hover {
+  background: #d90000 !important;
+  border-color: #d90000 !important;
+  transform: scale(1.03);
+}
+
 /* ============================================================
    BARRA PROPIA DE CONTROLES DE VIDEO + OCULTADOR AUTOMÁTICO DE PUNTERO (2s)
    (Cero logos ni enlaces a YouTube, tanto en vista normal como en Pantalla Completa)
@@ -2098,6 +2187,69 @@ body.video-cursor-none *,
   border-color: rgba(29, 185, 84, 0.45);
   color: #1ed760;
   font-weight: 700;
+}
+
+/* Colores representativos para cada pestaña en escritorio */
+.sidebar-tab-btn.tab-cloud .sidebar-tab-icon { color: #38bdf8; }
+.sidebar-tab-btn.tab-videos .sidebar-tab-icon { color: #f59e0b; }
+.sidebar-tab-btn.tab-favorites .sidebar-tab-icon { color: #f43f5e; }
+.sidebar-tab-btn.tab-youtube .sidebar-tab-icon { color: #ff0000; }
+.sidebar-tab-btn.tab-spotify .sidebar-tab-icon { color: #1db954; }
+
+.sidebar-tab-btn.tab-cloud:hover { background: rgba(56, 189, 248, 0.1); color: #fff; }
+.sidebar-tab-btn.tab-videos:hover { background: rgba(245, 158, 11, 0.1); color: #fff; }
+.sidebar-tab-btn.tab-favorites:hover { background: rgba(244, 63, 94, 0.1); color: #fff; }
+.sidebar-tab-btn.tab-youtube:hover { background: rgba(255, 0, 0, 0.1); color: #fff; }
+.sidebar-tab-btn.tab-spotify:hover { background: rgba(29, 185, 84, 0.1); color: #fff; }
+
+.sidebar-tab-btn.tab-cloud.active {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #38bdf8;
+}
+.sidebar-tab-btn.tab-cloud.active .sidebar-tab-count {
+  background: #38bdf8;
+  color: #000;
+}
+
+.sidebar-tab-btn.tab-videos.active {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #f59e0b;
+}
+.sidebar-tab-btn.tab-videos.active .sidebar-tab-count {
+  background: #f59e0b;
+  color: #000;
+}
+
+.sidebar-tab-btn.tab-favorites.active {
+  background: rgba(244, 63, 94, 0.16);
+  border-color: rgba(244, 63, 94, 0.45);
+  color: #f43f5e;
+}
+.sidebar-tab-btn.tab-favorites.active .sidebar-tab-count {
+  background: #f43f5e;
+  color: #fff;
+}
+
+.sidebar-tab-btn.tab-youtube.active {
+  background: rgba(255, 0, 0, 0.16);
+  border-color: rgba(255, 0, 0, 0.45);
+  color: #ff4d4d;
+}
+.sidebar-tab-btn.tab-youtube.active .sidebar-tab-count {
+  background: #ff0000;
+  color: #fff;
+}
+
+.sidebar-tab-btn.tab-spotify.active {
+  background: rgba(29, 185, 84, 0.16);
+  border-color: rgba(29, 185, 84, 0.45);
+  color: #1ed760;
+}
+.sidebar-tab-btn.tab-spotify.active .sidebar-tab-count {
+  background: #1db954;
+  color: #000;
 }
 
 .sidebar-tab-icon {
@@ -2595,9 +2747,43 @@ body.video-cursor-none *,
     color: #bbb;
   }
 
-  .sidebar-tab-btn.active {
-    color: #1ed760;
-    background: rgba(29, 185, 84, 0.12);
+  /* Iconos coloreados con su identidad visual */
+  .sidebar-tab-btn.tab-cloud .sidebar-tab-icon {
+    color: #38bdf8 !important;
+  }
+  .sidebar-tab-btn.tab-videos .sidebar-tab-icon {
+    color: #f59e0b !important;
+  }
+  .sidebar-tab-btn.tab-favorites .sidebar-tab-icon {
+    color: #f43f5e !important;
+  }
+  .sidebar-tab-btn.tab-youtube .sidebar-tab-icon {
+    color: #ff0000 !important;
+  }
+  .sidebar-tab-btn.tab-spotify .sidebar-tab-icon {
+    color: #1db954 !important;
+  }
+
+  /* Estado activo individual por pestaña */
+  .sidebar-tab-btn.tab-cloud.active {
+    color: #38bdf8 !important;
+    background: rgba(56, 189, 248, 0.14) !important;
+  }
+  .sidebar-tab-btn.tab-videos.active {
+    color: #f59e0b !important;
+    background: rgba(245, 158, 11, 0.14) !important;
+  }
+  .sidebar-tab-btn.tab-favorites.active {
+    color: #f43f5e !important;
+    background: rgba(244, 63, 94, 0.14) !important;
+  }
+  .sidebar-tab-btn.tab-youtube.active {
+    color: #ff4d4d !important;
+    background: rgba(255, 0, 0, 0.14) !important;
+  }
+  .sidebar-tab-btn.tab-spotify.active {
+    color: #1ed760 !important;
+    background: rgba(29, 185, 84, 0.14) !important;
   }
 
   .sidebar-tab-icon {
@@ -2709,6 +2895,21 @@ body.video-cursor-none *,
     display: none;
   }
 
+  /* El botón de aleatorio siempre visible y accesible en móvil */
+  .bottom-ctrl-btn.small.shuffle-btn {
+    display: inline-flex !important;
+    width: 32px;
+    height: 32px;
+    padding: 4px;
+    color: #999;
+  }
+
+  .bottom-ctrl-btn.small.shuffle-btn.active {
+    color: #1ed760 !important;
+    background: rgba(29, 185, 84, 0.22) !important;
+    border-radius: 6px;
+  }
+
   .bottom-ctrl-btn {
     padding: 4px;
     color: #d0d0d0;
@@ -2790,6 +2991,24 @@ body.video-cursor-none *,
     color: #1ed760;
   }
 
+  .mobile-tab-pill.cloud {
+    background: rgba(56, 189, 248, 0.14);
+    border-color: rgba(56, 189, 248, 0.35);
+    color: #38bdf8;
+  }
+
+  .mobile-tab-pill.videos {
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.35);
+    color: #f59e0b;
+  }
+
+  .mobile-tab-pill.favorites {
+    background: rgba(244, 63, 94, 0.14);
+    border-color: rgba(244, 63, 94, 0.35);
+    color: #f43f5e;
+  }
+
   .unified-search-box input {
     height: 38px;
     padding: 8px 36px 8px 38px;
@@ -2815,9 +3034,45 @@ body.video-cursor-none *,
     margin-bottom: 12px;
   }
 
+  /* Botón flotante de Pantalla Completa en móvil */
+  .btn-floating-fullscreen {
+    padding: 6px 11px;
+    font-size: 0.72rem;
+  }
+
+  .btn-floating-fullscreen.floating {
+    top: 8px;
+    left: 8px;
+    z-index: 28;
+  }
+
+  /* Barra de video interna en móvil */
+  .custom-video-vol {
+    display: none !important;
+  }
+
+  .custom-video-controls-row {
+    gap: 4px;
+  }
+
+  .custom-video-time {
+    font-size: 0.68rem;
+    margin-left: 2px;
+  }
+
+  .custom-video-quality {
+    padding: 3px 6px;
+    font-size: 0.72rem;
+  }
+
+  .custom-video-quality select {
+    font-size: 0.72rem;
+  }
+
   .yt-controls-bar {
     gap: 6px;
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .yt-controls-bar .btn-control,

@@ -1632,7 +1632,7 @@ export default function App() {
 
         <nav className="sidebar-nav">
           <button
-            className={`sidebar-tab-btn ${tab === 'cloud' ? 'active' : ''}`}
+            className={`sidebar-tab-btn tab-cloud ${tab === 'cloud' ? 'active' : ''}`}
             onClick={() => cambiarPestana('cloud')}
           >
             <span className="sidebar-tab-icon">
@@ -1643,7 +1643,7 @@ export default function App() {
           </button>
 
           <button
-            className={`sidebar-tab-btn ${tab === 'videos_nube' ? 'active' : ''}`}
+            className={`sidebar-tab-btn tab-videos ${tab === 'videos_nube' ? 'active' : ''}`}
             onClick={() => cambiarPestana('videos_nube')}
           >
             <span className="sidebar-tab-icon">
@@ -1654,7 +1654,7 @@ export default function App() {
           </button>
 
           <button
-            className={`sidebar-tab-btn ${tab === 'favorites' ? 'active' : ''}`}
+            className={`sidebar-tab-btn tab-favorites ${tab === 'favorites' ? 'active' : ''}`}
             onClick={() => cambiarPestana('favorites')}
           >
             <span className="sidebar-tab-icon">
@@ -1665,7 +1665,7 @@ export default function App() {
           </button>
 
           <button
-            className={`sidebar-tab-btn ${tab === 'youtube' ? 'active' : ''}`}
+            className={`sidebar-tab-btn tab-youtube ${tab === 'youtube' ? 'active' : ''}`}
             onClick={() => cambiarPestana('youtube')}
           >
             <span className="sidebar-tab-icon">
@@ -1676,7 +1676,7 @@ export default function App() {
           </button>
 
           <button
-            className={`sidebar-tab-btn ${tab === 'spotify' ? 'active' : ''}`}
+            className={`sidebar-tab-btn tab-spotify ${tab === 'spotify' ? 'active' : ''}`}
             onClick={() => cambiarPestana('spotify')}
           >
             <span className="sidebar-tab-icon">
@@ -1788,17 +1788,34 @@ export default function App() {
           <div className="section-header">
             <div className="section-title-row">
               <h2>{tab === 'cloud' ? 'Canciones en la Nube' : 'Mis Canciones Favoritas'}</h2>
-              {tab === 'cloud' && (
+              <div className="section-header-actions">
                 <button
-                  className="btn-refresh-small"
-                  onClick={() => cargarMusica(2)}
-                  title="Recargar canciones de la nube"
-                  disabled={cargandoMusica}
+                  className={`btn-shuffle-header ${isShuffle ? 'active' : ''}`}
+                  onClick={() => {
+                    const nuevo = !isShuffle;
+                    setIsShuffle(nuevo);
+                    if (nuevo && audiosVisibles.length > 0) {
+                      const idx = Math.floor(Math.random() * audiosVisibles.length);
+                      reproducirMP3(audiosVisibles[idx]);
+                    }
+                  }}
+                  title={isShuffle ? 'Modo Aleatorio: ACTIVADO (clic para desactivar)' : 'Activar Modo Aleatorio'}
                 >
-                  <RefreshCw size={14} className={cargandoMusica ? 'icon-spin' : ''} />
-                  {cargandoMusica ? 'Cargando...' : 'Actualizar'}
+                  <Shuffle size={14} strokeWidth={2.3} />
+                  <span>{isShuffle ? 'Aleatorio: ON' : 'Aleatorio'}</span>
                 </button>
-              )}
+                {tab === 'cloud' && (
+                  <button
+                    className="btn-refresh-small"
+                    onClick={() => cargarMusica(2)}
+                    title="Recargar canciones de la nube"
+                    disabled={cargandoMusica}
+                  >
+                    <RefreshCw size={14} className={cargandoMusica ? 'icon-spin' : ''} />
+                    {cargandoMusica ? 'Cargando...' : 'Actualizar'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -2035,6 +2052,21 @@ export default function App() {
                         onDoubleClick={pantallaCompletaVideo}
                         title="Clic para pausar/reproducir • Doble clic para Pantalla Completa"
                       />
+
+                      {/* Botón flotante directo para Pantalla Completa en móvil y PC */}
+                      <button
+                        className={`btn-floating-fullscreen floating ${
+                          cursorVideoOculto ? 'fade-out-idle' : ''
+                        }`}
+                        onClick={e => {
+                          e.stopPropagation();
+                          pantallaCompletaVideo();
+                        }}
+                        title="Ver en Pantalla Completa"
+                      >
+                        <Maximize2 size={14} strokeWidth={2.4} />
+                        <span>Pantalla Completa</span>
+                      </button>
 
                       {/* Barra de controles integrada en el video (se oculta sola junto con la flecha tras 2s sin mover el mouse) */}
                       <div
@@ -2423,6 +2455,21 @@ export default function App() {
                           title="Clic para pausar/reproducir • Doble clic para Pantalla Completa"
                         />
 
+                        {/* Botón flotante directo para Pantalla Completa en móvil y PC */}
+                        <button
+                          className={`btn-floating-fullscreen floating ${
+                            cursorVideoOculto ? 'fade-out-idle' : ''
+                          }`}
+                          onClick={e => {
+                            e.stopPropagation();
+                            alternarPantallaCompletaElemento(ytEmbedWrapRef.current);
+                          }}
+                          title="Ver en Pantalla Completa"
+                        >
+                          <Maximize2 size={14} strokeWidth={2.4} />
+                          <span>Pantalla Completa</span>
+                        </button>
+
                         <button
                           className={`btn-toggle-video-discreet floating ${
                             cursorVideoOculto ? 'fade-out-idle' : ''
@@ -2709,7 +2756,7 @@ export default function App() {
                           </div>
                           {!ytPantallaBloqueada && (
                             <button
-                              className="btn-control"
+                              className="btn-control btn-fullscreen-prominent"
                               onClick={() => alternarPantallaCompletaElemento(ytEmbedWrapRef.current)}
                               title="Ver video en pantalla completa"
                             >
@@ -3273,9 +3320,9 @@ export default function App() {
             <div className="bottom-player-center">
               <div className="bottom-player-buttons">
                 <button
-                  className={`bottom-ctrl-btn small ${isShuffle ? 'active' : ''}`}
+                  className={`bottom-ctrl-btn small shuffle-btn ${isShuffle ? 'active' : ''}`}
                   onClick={() => setIsShuffle(!isShuffle)}
-                  title="Aleatorio (Mi Música)"
+                  title={isShuffle ? 'Modo Aleatorio: ACTIVADO' : 'Activar Modo Aleatorio'}
                 >
                   <Shuffle size={16} strokeWidth={2} />
                 </button>
