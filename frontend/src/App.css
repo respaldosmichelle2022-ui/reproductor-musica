@@ -843,16 +843,23 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.55);
   padding: 3px;
   border-radius: 999px;
   border: 1px solid #383838;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+
+.yt-sidebar-tabs-toggle::-webkit-scrollbar {
+  display: none;
 }
 
 .yt-tab-pill-btn {
   background: transparent;
   border: none;
-  color: #aaa;
+  color: #bbb;
   font-size: 0.72rem;
   font-weight: 600;
   padding: 4px 10px;
@@ -861,6 +868,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
   transition: all 0.15s ease;
 }
 

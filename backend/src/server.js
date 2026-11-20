@@ -2,6 +2,7 @@
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import https from 'https';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { b2Activo, pistasB2, videosB2 } from './b2.js';
@@ -444,6 +445,65 @@ app.get('/api/spotify/audio', async (req, res) => {
   }
 });
 
+// Endpoint para Radio de Sugerencias y Artistas Similares en Spotify
+app.get('/api/spotify/radio', async (req, res) => {
+  const query = String(req.query.q || '').trim();
+  const artist = String(req.query.artist || '').trim();
+  const title = String(req.query.title || '').trim();
+
+  if (!query && !artist && !title) return res.json({ tracks: { items: [] } });
+
+  const cacheKey = `sp_radio__${query}__${artist}__${title}`.toLowerCase();
+  const cached = obtenerDeCache(cacheSpotifySearch, cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const qMix = `${artist || query} canciones similares grandes exitos`.trim();
+    const rSearch = await ytSearch(qMix);
+    const bestVid = rSearch.videos?.[0];
+    let items = [];
+
+    if (bestVid?.videoId) {
+      const mixData = await fetchYouTubeMix(bestVid.videoId);
+      if (mixData.items && mixData.items.length > 0) {
+        items = mixData.items.map(v => ({
+          id: v.id?.videoId,
+          uri: `spotify:track:${v.id?.videoId}`,
+          name: v.snippet?.title || 'Canción',
+          duration_ms: 210000,
+          artists: [{ name: v.snippet?.channelTitle || 'Artista' }],
+          album: {
+            name: mixData.mixTitle || 'Spotify Radio Mix',
+            images: [{ url: v.snippet?.thumbnails?.default?.url }]
+          },
+          directVideoId: v.id?.videoId
+        }));
+      }
+    }
+
+    if (items.length === 0 && rSearch.videos) {
+      items = rSearch.videos.slice(0, 15).map(v => ({
+        id: v.videoId,
+        uri: `spotify:track:${v.videoId}`,
+        name: v.title,
+        duration_ms: (v.seconds || 210) * 1000,
+        artists: [{ name: v.author?.name || 'Artista' }],
+        album: {
+          name: 'Spotify Radio Mix',
+          images: [{ url: v.thumbnail || v.image }]
+        },
+        directVideoId: v.videoId
+      }));
+    }
+
+    const payload = { tracks: { items } };
+    guardarEnCache(cacheSpotifySearch, cacheKey, payload);
+    return res.json(payload);
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 // ---------- YouTube ----------
 app.get('/api/youtube/search', async (req, res) => {
   const query = String(req.query.q || '').trim();
@@ -487,56 +547,239 @@ app.get('/api/youtube/search', async (req, res) => {
   }
 });
 
+// Helper para extraer ytInitialData de páginas de YouTube de forma segura
+function extraerInitialDataYouTube(html) {
+  const startPatterns = ['var ytInitialData = ', 'ytInitialData = '];
+  let startIdx = -1;
+  for (const p of startPatterns) {
+    const idx = html.indexOf(p);
+    if (idx !== -1) {
+      startIdx = idx + p.length;
+      break;
+    }
+  }
+  if (startIdx === -1) return null;
+  const endIdx = html.indexOf(';</script>', startIdx);
+  if (endIdx === -1) return null;
+  try {
+    return JSON.parse(html.slice(startIdx, endIdx));
+  } catch (e) {
+    return null;
+  }
+}
+
+// Obtiene la Radio / Mix oficial de YouTube (RD) con canciones y otros artistas recomendados
+function fetchYouTubeMix(videoId) {
+  return new Promise(resolve => {
+    if (!videoId) return resolve({ mixTitle: '', items: [] });
+    const url = `https://www.youtube.com/watch?v=${videoId}&list=RD${videoId}`;
+    https.get(
+      url,
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'es-MX,es;q=0.9,en;q=0.8'
+        }
+      },
+      res => {
+        let body = '';
+        res.on('data', c => (body += c));
+        res.on('end', () => {
+          try {
+            const data = extraerInitialDataYouTube(body);
+            const pl = data?.contents?.twoColumnWatchNextResults?.playlist?.playlist;
+            const contents = pl?.contents || [];
+            const items = [];
+            const vistos = new Set();
+
+            for (const it of contents) {
+              const p = it.playlistPanelVideoRenderer;
+              if (!p || !p.videoId || vistos.has(p.videoId)) continue;
+              vistos.add(p.videoId);
+              const title = p.title?.simpleText || p.title?.runs?.[0]?.text || '';
+              const channelTitle =
+                p.shortBylineText?.runs?.[0]?.text ||
+                p.longBylineText?.runs?.[0]?.text ||
+                'YouTube';
+              const duration = p.lengthText?.simpleText || '';
+              const thumb =
+                p.thumbnail?.thumbnails?.[p.thumbnail.thumbnails.length - 1]?.url ||
+                p.thumbnail?.thumbnails?.[0]?.url ||
+                `https://i.ytimg.com/vi/${p.videoId}/hqdefault.jpg`;
+
+              items.push({
+                id: { videoId: p.videoId },
+                snippet: {
+                  title,
+                  channelTitle,
+                  duration,
+                  thumbnails: {
+                    default: { url: thumb }
+                  }
+                }
+              });
+            }
+
+            // Si el playlist RD no devolvió suficientes items, extraer de secondaryResults (videos relacionados)
+            if (items.length < 5 && data?.contents?.twoColumnWatchNextResults) {
+              const secResults =
+                data.contents.twoColumnWatchNextResults.secondaryResults?.secondaryResults?.results ||
+                data.contents.twoColumnWatchNextResults.secondaryResults?.results ||
+                [];
+              for (const s of secResults) {
+                const section = s.itemSectionRenderer?.contents || [s];
+                for (const entry of section) {
+                  if (entry.compactVideoRenderer) {
+                    const c = entry.compactVideoRenderer;
+                    if (!c.videoId || vistos.has(c.videoId)) continue;
+                    vistos.add(c.videoId);
+                    items.push({
+                      id: { videoId: c.videoId },
+                      snippet: {
+                        title: c.title?.simpleText || c.title?.runs?.[0]?.text || '',
+                        channelTitle: c.shortBylineText?.runs?.[0]?.text || 'YouTube',
+                        duration: c.lengthText?.simpleText || '',
+                        thumbnails: {
+                          default: {
+                            url:
+                              c.thumbnail?.thumbnails?.[0]?.url ||
+                              `https://i.ytimg.com/vi/${c.videoId}/hqdefault.jpg`
+                          }
+                        }
+                      }
+                    });
+                  } else if (entry.lockupViewModel) {
+                    const lock = entry.lockupViewModel;
+                    const id =
+                      lock.contentImage?.thumbnailViewModel?.overlays?.[0]
+                        ?.thumbnailBottomOverlayViewModel?.animationActivationTargetId ||
+                      lock.rendererContext?.commandContext?.onTap?.innertubeCommand
+                        ?.watchEndpoint?.videoId;
+                    if (!id || vistos.has(id)) continue;
+                    vistos.add(id);
+                    const title = lock.metadata?.lockupMetadataViewModel?.title?.content || '';
+                    const ch =
+                      lock.metadata?.lockupMetadataViewModel?.metadata
+                        ?.contentMetadataViewModel?.metadataRows?.[0]?.parts?.[0]?.text ||
+                      'YouTube';
+                    const thumb =
+                      lock.contentImage?.thumbnailViewModel?.image?.sources?.[0]?.url ||
+                      `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+                    items.push({
+                      id: { videoId: id },
+                      snippet: {
+                        title,
+                        channelTitle: ch,
+                        duration: '',
+                        thumbnails: { default: { url: thumb } }
+                      }
+                    });
+                  }
+                }
+              }
+            }
+
+            resolve({
+              mixTitle: pl?.title || 'Mix de Artistas Similares',
+              items
+            });
+          } catch (e) {
+            resolve({ mixTitle: '', items: [] });
+          }
+        });
+      }
+    ).on('error', () => resolve({ mixTitle: '', items: [] }));
+  });
+}
+
 // Endpoint exclusivo para Radio de Sugerencias y Coincidencias de YouTube
-// Genera variedad de canciones del artista/género sin repetir la misma canción una y otra vez
+// Soporta modo 'mix' (artistas y canciones similares de YouTube) y modo 'artist' (éxitos del artista)
 app.get('/api/youtube/radio', async (req, res) => {
+  const videoId = String(req.query.videoId || '').trim();
+  const currentTitle = String(req.query.title || '').trim();
+  const artistParam = String(req.query.artist || '').trim();
   const query = String(req.query.q || '').trim();
-  const currentTitle = String(req.query.title || '').trim().toLowerCase();
+  const mode = String(req.query.mode || 'mix').toLowerCase(); // 'mix' | 'artist'
   const excludeId = String(req.query.excludeId || '').trim();
 
-  if (!query && !currentTitle) return res.json({ items: [] });
+  if (!videoId && !query && !currentTitle) return res.json({ items: [], mixTitle: '' });
 
-  const cacheKey = `${query}__${currentTitle}__${excludeId}`.toLowerCase();
+  const cacheKey = `${mode}__${videoId}__${currentTitle}__${artistParam}__${query}`.toLowerCase();
   const cached = obtenerDeCache(cacheYouTubeRadio, cacheKey);
   if (cached) return res.json(cached);
 
   try {
-    // 1. Limpiar artista y título de la canción para buscar coincidencias reales
-    let artista = query;
-    let temaExcluir = '';
+    // Detectar artista limpio
+    let artista = artistParam;
+    let temaCancion = currentTitle;
 
-    if (currentTitle) {
+    if (!artista && currentTitle) {
       const partes = currentTitle.split(/[-–—:]/);
       if (partes.length > 1) {
-        if (!artista || artista.length < 3) artista = partes[0].trim();
-        temaExcluir = partes.slice(1).join(' ').trim().replace(/\(.*?\)|\[.*?\]/g, '').trim().toLowerCase();
-      } else {
-        temaExcluir = currentTitle.replace(/\(.*?\)|\[.*?\]/g, '').trim().toLowerCase();
+        artista = partes[0].trim();
+        temaCancion = partes.slice(1).join(' ').trim();
       }
     }
+    if (!artista) artista = query;
 
-    temaExcluir = temaExcluir.replace(/official|video|audio|lyrics|letra|remastered|hd|4k|en vivo|live/gi, '').trim();
+    // 1. MODO MIX DE YOUTUBE: Descubrimiento de OTROS ARTISTAS Y CANCIONES AFINES
+    if (mode === 'mix') {
+      let mixResult = { mixTitle: '', items: [] };
 
-    // 2. Buscar canciones variadas y grandes éxitos del artista
-    const busquedaRadio = `${artista || query} canciones grandes exitos`.trim();
-    const r = await ytSearch(busquedaRadio);
+      // Si tenemos el videoId, obtenemos directamente la Radio Mix oficial de YouTube (RD)
+      if (videoId) {
+        mixResult = await fetchYouTubeMix(videoId);
+      }
 
+      // Si no hubo videoId o trajo pocos resultados, buscar el video en YouTube para obtener su Mix
+      if (!mixResult.items || mixResult.items.length < 5) {
+        const queryBusq = `${artista || ''} ${temaCancion || query}`.trim();
+        const rSearch = await ytSearch(queryBusq);
+        const bestVid = rSearch.videos?.[0];
+        if (bestVid?.videoId && bestVid.videoId !== videoId) {
+          mixResult = await fetchYouTubeMix(bestVid.videoId);
+        }
+      }
+
+      // Respaldo inteligente si YouTube no genera RD
+      if (!mixResult.items || mixResult.items.length < 5) {
+        const busquedaMix = `${artista || ''} canciones similares mix exitos`.trim();
+        const rFallback = await ytSearch(busquedaMix);
+        const itemsFallback = (rFallback.videos || []).slice(0, 20).map(v => ({
+          id: { videoId: v.videoId },
+          snippet: {
+            title: v.title,
+            channelTitle: v.author?.name || 'YouTube',
+            duration: v.timestamp || '',
+            thumbnails: { default: { url: v.thumbnail || v.image } }
+          }
+        }));
+        mixResult = {
+          mixTitle: `Mix de Canciones y Artistas Similares`,
+          items: itemsFallback
+        };
+      }
+
+      const payload = {
+        mixTitle: mixResult.mixTitle || `Mix de canciones similares`,
+        items: mixResult.items
+      };
+      guardarEnCache(cacheYouTubeRadio, cacheKey, payload);
+      return res.json(payload);
+    }
+
+    // 2. MODO DEL MISMO ARTISTA: Grandes éxitos de este artista
+    const busquedaArtista = `${artista} canciones grandes exitos`.trim();
+    const r = await ytSearch(busquedaArtista);
     const vistos = new Set();
     if (excludeId) vistos.add(excludeId);
 
     const items = [];
     for (const v of r.videos || []) {
       if (!v.videoId || vistos.has(v.videoId)) continue;
-
-      const tituloMin = v.title.toLowerCase();
-      // Si el video actual es "Seducción", excluimos otros videos que solo sean duplicados de "Seducción"
-      if (temaExcluir && temaExcluir.length > 3 && tituloMin.includes(temaExcluir)) {
-        continue;
-      }
-
       const claveTitulo = v.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 22);
       if (vistos.has(claveTitulo)) continue;
-
       vistos.add(v.videoId);
       vistos.add(claveTitulo);
 
@@ -546,18 +789,18 @@ app.get('/api/youtube/radio', async (req, res) => {
           title: v.title,
           channelTitle: v.author?.name || 'YouTube',
           duration: v.timestamp || '',
-          thumbnails: {
-            default: { url: v.thumbnail || v.image }
-          }
+          thumbnails: { default: { url: v.thumbnail || v.image } }
         }
       });
-
       if (items.length >= 20) break;
     }
 
-    const payload = { items };
+    const payload = {
+      mixTitle: `Grandes éxitos de ${artista}`,
+      items
+    };
     guardarEnCache(cacheYouTubeRadio, cacheKey, payload);
-    res.json(payload);
+    return res.json(payload);
   } catch (err) {
     console.error('Error generando Radio de YouTube:', err.message);
     res.status(500).json({ error: 'Error al generar radio de sugerencias' });

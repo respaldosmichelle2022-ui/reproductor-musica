@@ -42,6 +42,7 @@ import {
   Radio,
   ListMusic,
   Loader2,
+  Mic,
   Settings
 } from 'lucide-react';
 import './App.css';
@@ -106,8 +107,10 @@ export default function App() {
     return s !== null ? s === 'true' : true; // Por defecto SIEMPRE activado (true)
   });
   const [ytRadioSugerencias, setYtRadioSugerencias] = useState([]);
+  const [ytRadioMixTitle, setYtRadioMixTitle] = useState('Mix de Artistas Similares');
+  const [ytRadioModo, setYtRadioModo] = useState('mix'); // 'mix' (otros artistas y similares) | 'artista' (del artista)
   const [ytCargandoRadio, setYtCargandoRadio] = useState(false);
-  const [ytTabSidebar, setYtTabSidebar] = useState('radio'); // 'radio' | 'busqueda'
+  const [ytTabSidebar, setYtTabSidebar] = useState('mix'); // 'mix' | 'artista' | 'busqueda'
   const ytHistorialReproducidosRef = useRef(new Set());
   const ytSearchCacheRef = useRef(new Map());
 
@@ -116,6 +119,9 @@ export default function App() {
     const s = localStorage.getItem('modo_radio_spotify');
     return s !== null ? s === 'true' : true; // Por defecto SIEMPRE activado (true)
   });
+  const [spotifyRadioSugerencias, setSpotifyRadioSugerencias] = useState([]);
+  const [spotifyVistaBusqueda, setSpotifyVistaBusqueda] = useState('resultados'); // 'resultados' | 'radio'
+  const [spotifyCargandoRadio, setSpotifyCargandoRadio] = useState(false);
 
   const [ytSearchQuery, setYtSearchQuery] = useState('');
   const [ytBuscando, setYtBuscando] = useState(false);
@@ -743,38 +749,30 @@ export default function App() {
     setVerificandoClaveYT(false);
   };
 
-  const cargarRadioSugerenciasYT = async (videoObj, fallbackQuery = '') => {
+  const cargarRadioSugerenciasYT = async (videoObj, fallbackQuery = '', modoForzado = null) => {
     const vId = videoObj?.id?.videoId || videoObj?.id || currentVideo;
     const title = videoObj?.snippet?.title || '';
     const channel = videoObj?.snippet?.channelTitle || '';
+    const modo = modoForzado || ytRadioModo || 'mix';
 
-    let q = fallbackQuery;
-    if (!q) {
-      const cleanChannel = (channel || '').replace(/VEVO|Official|Oficial|Topic|Canal/gi, '').trim();
-      const partes = title.split(/[-–—:]/);
-      if (cleanChannel && cleanChannel.length > 2) {
-        q = cleanChannel;
-      } else if (partes.length > 1) {
-        q = partes[0].trim();
-      } else {
-        q = title;
-      }
-    }
-
-    if (!q) return;
+    if (!vId && !title && !fallbackQuery) return;
 
     setYtCargandoRadio(true);
     try {
       const r = await axios.get(`${API}/api/youtube/radio`, {
         params: {
-          q,
+          videoId: vId,
           title,
+          artist: channel,
+          q: fallbackQuery,
+          mode: modo,
           excludeId: vId
         }
       });
       if (r.data?.items && r.data.items.length > 0) {
         setYtRadioSugerencias(r.data.items);
-        setYtTabSidebar('radio');
+        if (r.data.mixTitle) setYtRadioMixTitle(r.data.mixTitle);
+        setYtTabSidebar(modo === 'artista' ? 'artista' : 'mix');
       }
     } catch (e) {
       console.warn('Error cargando sugerencias de Radio YouTube:', e);
@@ -782,11 +780,35 @@ export default function App() {
     setYtCargandoRadio(false);
   };
 
+  const cargarRadioSugerenciasSpotify = async track => {
+    if (!track) return;
+    const artista = track.artists?.[0]?.name || '';
+    setSpotifyCargandoRadio(true);
+    try {
+      const r = await axios.get(`${API}/api/spotify/radio`, {
+        params: {
+          q: spotifySearchQuery,
+          artist: artista,
+          title: track.name
+        }
+      });
+      if (r.data?.tracks?.items && r.data.tracks.items.length > 0) {
+        setSpotifyRadioSugerencias(r.data.tracks.items);
+      }
+    } catch (e) {
+      console.warn('Error cargando radio de Spotify:', e);
+    }
+    setSpotifyCargandoRadio(false);
+  };
+
   const siguienteYouTube = () => {
     if (modoRadioYT) {
-      // 1. MODO RADIO SUGERENCIAS ACTIVADO:
-      // Busca sugerencias de radio (coincidencias) que no hayan sonado recientemente
-      const pool = ytRadioSugerencias.length > 0 ? ytRadioSugerencias : ytVideos;
+      // 1. MODO RADIO SUGERENCIAS / MIX ACTIVADO:
+      const pool =
+        ytTabSidebar === 'busqueda' || ytRadioSugerencias.length === 0
+          ? ytVideos
+          : ytRadioSugerencias;
+
       const noReproducidas = pool.filter(v => {
         const id = v.id?.videoId || v.id;
         return id && !ytHistorialReproducidosRef.current.has(id);
@@ -794,15 +816,16 @@ export default function App() {
 
       const candidatas = noReproducidas.length > 0 ? noReproducidas : pool;
       if (candidatas.length > 0) {
-        // Seleccionar de forma aleatoria inteligente entre las sugerencias
-        const idxAzar = Math.floor(Math.random() * candidatas.length);
-        const elegida = candidatas[idxAzar];
+        // Seleccionar entre las mejores opciones sugeridas para variedad musical sin repetir
+        const opciones = candidatas.slice(0, Math.min(6, candidatas.length));
+        const idxAzar = Math.floor(Math.random() * opciones.length);
+        const elegida = opciones[idxAzar];
         const vId = elegida.id?.videoId || elegida.id;
         const idxEnVideos = ytVideos.findIndex(v => (v.id?.videoId || v.id) === vId);
         reproducirYouTube(vId, idxEnVideos >= 0 ? idxEnVideos : 0, elegida);
 
-        if (noReproducidas.length <= 2) {
-          cargarRadioSugerenciasYT(elegida, ytSearchQuery);
+        if (noReproducidas.length <= 3) {
+          cargarRadioSugerenciasYT(elegida, ytSearchQuery, ytRadioModo);
         }
         return;
       }
@@ -832,7 +855,7 @@ export default function App() {
         const actual =
           ytVideos.find(v => (v.id?.videoId || v.id) === currentVideo) ||
           ytRadioSugerencias.find(v => (v.id?.videoId || v.id) === currentVideo);
-        if (actual) cargarRadioSugerenciasYT(actual, ytSearchQuery);
+        if (actual) cargarRadioSugerenciasYT(actual, ytSearchQuery, ytRadioModo);
       }
       return nuevo;
     });
@@ -1376,6 +1399,10 @@ export default function App() {
     setSpotifyCargandoAudio(true);
     setSpotifyError('');
 
+    if (modoRadioSpotify) {
+      cargarRadioSugerenciasSpotify(track);
+    }
+
     const artistas = track.artists?.map(a => a.name).join(' ') || '';
     const consulta = `${track.name} ${artistas}`.trim();
 
@@ -1471,6 +1498,23 @@ export default function App() {
     if (!c || c.length === 0) return;
 
     if (modoRadioSpotify) {
+      // Si tenemos sugerencias de Radio Spotify (artistas y canciones similares), continuar con una de ellas
+      if (spotifyRadioSugerencias && spotifyRadioSugerencias.length > 0) {
+        const noEnCola = spotifyRadioSugerencias.filter(
+          st => !c.some(existente => existente.id === st.id || existente.name.toLowerCase() === st.name.toLowerCase())
+        );
+        if (noEnCola.length > 0) {
+          const candidatas = noEnCola.slice(0, Math.min(5, noEnCola.length));
+          const elegida = candidatas[Math.floor(Math.random() * candidatas.length)];
+          const nuevaCola = [...c, elegida];
+          setSpotifyCola(nuevaCola);
+          spotifyColaRef.current = nuevaCola;
+          const sigIdx = nuevaCola.length - 1;
+          reproducirPistaSpotifyMulti(elegida, nuevaCola, sigIdx);
+          return;
+        }
+      }
+
       const esUltima = spotifyIndiceRef.current >= c.length - 1;
       const actual = spotifyTrackActual || c[spotifyIndiceRef.current];
 
@@ -2941,48 +2985,78 @@ export default function App() {
                 <div className="yt-mix-header">
                   <div className="yt-sidebar-header-row">
                     <h3>
-                      {ytTabSidebar === 'radio' && ytRadioSugerencias.length > 0
-                        ? `📻 Radio: Coincidencias de ${videoActivoObj?.snippet?.channelTitle || ytSearchQuery || 'Sugerencias'}`
-                        : ytBuscando
-                          ? `Buscando "${ytSearchQuery}"...`
-                          : ytSearchQuery.trim()
-                            ? `Resultados: ${ytSearchQuery}`
-                            : videoActivoObj
-                              ? `Mix: ${videoActivoObj.snippet.title}`
-                              : 'Videos sugeridos'}
+                      {ytTabSidebar === 'mix' && ytRadioSugerencias.length > 0
+                        ? `✨ Mix Radio: ${ytRadioMixTitle || 'Artistas y Canciones Similares'}`
+                        : ytTabSidebar === 'artista' && ytRadioSugerencias.length > 0
+                          ? `🎤 Éxitos de ${videoActivoObj?.snippet?.channelTitle || ytSearchQuery || 'Artista'}`
+                          : ytBuscando
+                            ? `Buscando "${ytSearchQuery}"...`
+                            : ytSearchQuery.trim()
+                              ? `Resultados: ${ytSearchQuery}`
+                              : videoActivoObj
+                                ? `Mix: ${videoActivoObj.snippet.title}`
+                                : 'Videos sugeridos'}
                     </h3>
-                    {ytRadioSugerencias.length > 0 && (
-                      <div className="yt-sidebar-tabs-toggle">
-                        <button
-                          className={`yt-tab-pill-btn ${ytTabSidebar === 'radio' ? 'active' : ''}`}
-                          onClick={() => setYtTabSidebar('radio')}
-                          title="Ver sugerencias y coincidencias inteligentes de radio"
-                        >
-                          <Radio size={12} strokeWidth={2.4} /> Radio ({ytRadioSugerencias.length})
-                        </button>
-                        <button
-                          className={`yt-tab-pill-btn ${ytTabSidebar === 'busqueda' ? 'active' : ''}`}
-                          onClick={() => setYtTabSidebar('busqueda')}
-                          title="Ver lista de búsqueda original"
-                        >
-                          <ListMusic size={12} strokeWidth={2.4} /> Búsqueda ({ytVideos.length})
-                        </button>
-                      </div>
+                  </div>
+
+                  {/* CHIPS DE MODOS DE REPRODUCCIÓN (MIX DE OTROS ARTISTAS, DEL MISMO ARTISTA, BÚSQUEDA) */}
+                  <div className="yt-sidebar-tabs-toggle">
+                    <button
+                      className={`yt-tab-pill-btn ${ytTabSidebar === 'mix' ? 'active' : ''}`}
+                      onClick={() => {
+                        setYtRadioModo('mix');
+                        setYtTabSidebar('mix');
+                        if (videoActivoObj && (ytRadioModo !== 'mix' || ytRadioSugerencias.length === 0)) {
+                          cargarRadioSugerenciasYT(videoActivoObj, ytSearchQuery, 'mix');
+                        }
+                      }}
+                      title="Mix de YouTube con canciones de OTROS artistas similares y afines al género"
+                    >
+                      <Sparkles size={12} strokeWidth={2.4} /> Mix (Otros Artistas) {ytTabSidebar === 'mix' && ytRadioSugerencias.length > 0 ? `(${ytRadioSugerencias.length})` : ''}
+                    </button>
+
+                    <button
+                      className={`yt-tab-pill-btn ${ytTabSidebar === 'artista' ? 'active' : ''}`}
+                      onClick={() => {
+                        setYtRadioModo('artista');
+                        setYtTabSidebar('artista');
+                        if (videoActivoObj && (ytRadioModo !== 'artista' || ytRadioSugerencias.length === 0)) {
+                          cargarRadioSugerenciasYT(videoActivoObj, ytSearchQuery, 'artista');
+                        }
+                      }}
+                      title="Grandes éxitos únicamente de este artista"
+                    >
+                      <Mic size={12} strokeWidth={2.4} /> Del Artista {ytTabSidebar === 'artista' && ytRadioSugerencias.length > 0 ? `(${ytRadioSugerencias.length})` : ''}
+                    </button>
+
+                    {ytVideos.length > 0 && (
+                      <button
+                        className={`yt-tab-pill-btn ${ytTabSidebar === 'busqueda' ? 'active' : ''}`}
+                        onClick={() => setYtTabSidebar('busqueda')}
+                        title="Ver lista de búsqueda original"
+                      >
+                        <ListMusic size={12} strokeWidth={2.4} /> Búsqueda ({ytVideos.length})
+                      </button>
                     )}
                   </div>
+
                   <p>
-                    {ytTabSidebar === 'radio' && ytRadioSugerencias.length > 0
-                      ? modoRadioYT
-                        ? '((•)) Radio activa: tocando de forma aleatoria canciones variadas del artista y similares sin repetir'
-                        : 'Sugerencias y grandes éxitos relacionados con la canción actual'
-                      : ytSearchQuery.trim()
-                        ? `${ytVideos.length} videos encontrados en vivo`
-                        : 'Los mixes son playlists que crea YouTube para ti'}
+                    {ytCargandoRadio
+                      ? '⏳ Cargando Mix inteligente de YouTube...'
+                      : ytTabSidebar === 'mix' && ytRadioSugerencias.length > 0
+                        ? modoRadioYT
+                          ? '((•)) Mix de YouTube activo: Descubriendo canciones y otros artistas afines al género sin repetir'
+                          : 'Sugerencias de otros artistas similares y grandes éxitos de la época'
+                        : ytTabSidebar === 'artista' && ytRadioSugerencias.length > 0
+                          ? `Grandes éxitos y canciones más escuchadas de ${videoActivoObj?.snippet?.channelTitle || 'este artista'}`
+                          : ytSearchQuery.trim()
+                            ? `${ytVideos.length} videos encontrados en vivo`
+                            : 'Los mixes son playlists que crea YouTube para ti'}
                   </p>
                 </div>
 
                 <div className="yt-sidebar-list">
-                  {((ytTabSidebar === 'radio' && ytRadioSugerencias.length > 0) ? ytRadioSugerencias : ytVideos).map((v, idx) => {
+                  {((ytTabSidebar !== 'busqueda' && ytRadioSugerencias.length > 0) ? ytRadioSugerencias : ytVideos).map((v, idx) => {
                     const vidId = v.id?.videoId || v.id;
                     const esActivo = vidId === currentVideo;
                     return (
@@ -3268,9 +3342,31 @@ export default function App() {
                 spotifySearchResults?.tracks?.items && (
                   <div className="spotify-results-section">
                     <div className="spotify-heading-row">
-                      <h3 className="spotify-section-heading">
-                        Canciones encontradas para "{spotifySearchQuery}" (clic para escuchar completa)
-                      </h3>
+                      <div className="spotify-heading-left">
+                        <h3 className="spotify-section-heading">
+                          {spotifyVistaBusqueda === 'radio' && spotifyRadioSugerencias.length > 0
+                            ? `✨ Mix Radio: Artistas y canciones similares`
+                            : `Canciones encontradas para "${spotifySearchQuery}" (clic para escuchar)`}
+                        </h3>
+                        {spotifyRadioSugerencias.length > 0 && (
+                          <div className="yt-sidebar-tabs-toggle" style={{ marginTop: 4 }}>
+                            <button
+                              className={`yt-tab-pill-btn ${spotifyVistaBusqueda === 'resultados' ? 'active' : ''}`}
+                              onClick={() => setSpotifyVistaBusqueda('resultados')}
+                              title="Ver lista de búsqueda original"
+                            >
+                              <ListMusic size={12} strokeWidth={2.4} /> Búsqueda ({spotifySearchResults?.tracks?.items?.length || 0})
+                            </button>
+                            <button
+                              className={`yt-tab-pill-btn ${spotifyVistaBusqueda === 'radio' ? 'active' : ''}`}
+                              onClick={() => setSpotifyVistaBusqueda('radio')}
+                              title="Ver artistas y canciones recomendadas afines"
+                            >
+                              <Sparkles size={12} strokeWidth={2.4} /> Mix Similares ({spotifyRadioSugerencias.length})
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <button
                         className={`btn-mode-toggle ${modoRadioSpotify ? 'active spotify' : ''}`}
                         onClick={() => {
@@ -3280,7 +3376,7 @@ export default function App() {
                             return nuevo;
                           });
                         }}
-                        title="Radio Sugerencias: Al terminar la lista, continúa buscando automáticamente más éxitos y coincidencias de este artista"
+                        title="Radio Sugerencias: Sugiere y continúa tocando éxitos y artistas similares sin parar"
                       >
                         {modoRadioSpotify ? (
                           <>
@@ -3294,15 +3390,21 @@ export default function App() {
                       </button>
                     </div>
                     <div className="spotify-tracks-table">
-                      {spotifySearchResults.tracks.items.map((t, idx) => {
+                      {((spotifyVistaBusqueda === 'radio' && spotifyRadioSugerencias.length > 0)
+                        ? spotifyRadioSugerencias
+                        : spotifySearchResults.tracks.items
+                      ).map((t, idx) => {
                         const esActiva = spotifyTrackActual?.id === t.id;
+                        const listaActual = (spotifyVistaBusqueda === 'radio' && spotifyRadioSugerencias.length > 0)
+                          ? spotifyRadioSugerencias
+                          : spotifySearchResults.tracks.items;
                         return (
                           <div
                             key={`${t.id}-${idx}`}
                             className="spotify-track-row"
                             style={esActiva ? { background: 'rgba(29,185,84,0.18)', borderLeft: '3px solid #1DB954' } : undefined}
                             onClick={() =>
-                              reproducirPistaSpotifyMulti(t, spotifySearchResults.tracks.items, idx)
+                              reproducirPistaSpotifyMulti(t, listaActual, idx)
                             }
                           >
                             <span className="track-idx" style={esActiva ? { color: '#1DB954', fontWeight: 800 } : undefined}>
