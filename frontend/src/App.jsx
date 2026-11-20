@@ -875,7 +875,12 @@ export default function App() {
 
   const cargarSugerenciasYouTube = () => {
     axios.get(`${API}/api/youtube/search`, { params: { q: 'Grandes Exitos Musica Latina' } })
-      .then(r => setYtVideos(r.data.items || []))
+      .then(r => {
+        if (r.data?.items) {
+          setYtVideos(r.data.items);
+          setYtTabSidebar('busqueda');
+        }
+      })
       .catch(console.error);
   };
 
@@ -1269,13 +1274,21 @@ export default function App() {
   // Búsqueda en vivo en YouTube: actualiza sugerencias mientras escribes con caché instantáneo
   useEffect(() => {
     const q = ytSearchQuery.trim();
-    if (!q || q.length < 3) return;
+    if (!q) {
+      setYtBuscando(false);
+      return;
+    }
+
+    if (q.length < 2) return;
 
     const directId = extraerIdYouTube(q);
     if (directId) {
       reproducirYouTube(directId);
       return;
     }
+
+    // Aseguramos que la columna lateral cambie a búsqueda para mostrar resultados dinámicos
+    setYtTabSidebar('busqueda');
 
     const cacheKey = q.toLowerCase();
     if (ytSearchCacheRef.current.has(cacheKey)) {
@@ -1284,20 +1297,21 @@ export default function App() {
       return;
     }
 
+    setYtBuscando(true);
     let cancelado = false;
     const t = setTimeout(async () => {
-      setYtBuscando(true);
       try {
         const r = await axios.get(`${API}/api/youtube/search`, { params: { q } });
         if (!cancelado && r.data?.items) {
           ytSearchCacheRef.current.set(cacheKey, r.data.items);
           setYtVideos(r.data.items);
+          setYtTabSidebar('busqueda');
         }
       } catch (e) {
         console.error('Error en búsqueda dinámica de YouTube:', e);
       }
       if (!cancelado) setYtBuscando(false);
-    }, 450);
+    }, 280);
 
     return () => {
       cancelado = true;
@@ -1745,7 +1759,18 @@ export default function App() {
   const manejarCambioBuscadorUnico = val => {
     if (tab === 'youtube') {
       setYtSearchQuery(val);
-      if (!val.trim()) cargarSugerenciasYouTube();
+      const q = val.trim();
+      if (q) {
+        setYtTabSidebar('busqueda');
+        setYtBuscando(true);
+      } else {
+        setYtBuscando(false);
+        if (currentVideo && ytRadioSugerencias.length > 0) {
+          setYtTabSidebar('mix');
+        } else {
+          cargarSugerenciasYouTube();
+        }
+      }
     } else if (tab === 'spotify') {
       setSpotifySearchQuery(val);
       if (val.trim() && spotifySubTab !== 'buscar') {
@@ -1762,7 +1787,12 @@ export default function App() {
   const limpiarBuscadorUnico = () => {
     if (tab === 'youtube') {
       setYtSearchQuery('');
-      cargarSugerenciasYouTube();
+      setYtBuscando(false);
+      if (currentVideo && ytRadioSugerencias.length > 0) {
+        setYtTabSidebar('mix');
+      } else {
+        cargarSugerenciasYouTube();
+      }
     } else if (tab === 'spotify') {
       setSpotifySearchQuery('');
       setSpotifySearchResults(null);
@@ -1782,10 +1812,12 @@ export default function App() {
         reproducirYouTube(directId);
         return;
       }
+      setYtTabSidebar('busqueda');
       setYtBuscando(true);
       const cacheKey = q.toLowerCase();
       if (ytSearchCacheRef.current.has(cacheKey)) {
         setYtVideos(ytSearchCacheRef.current.get(cacheKey));
+        setYtTabSidebar('busqueda');
         setYtBuscando(false);
         return;
       }
@@ -1794,6 +1826,7 @@ export default function App() {
         if (r.data?.items) {
           ytSearchCacheRef.current.set(cacheKey, r.data.items);
           setYtVideos(r.data.items);
+          setYtTabSidebar('busqueda');
         }
       } catch (e) {
         console.error(e);
@@ -2985,22 +3018,38 @@ export default function App() {
                 <div className="yt-mix-header">
                   <div className="yt-sidebar-header-row">
                     <h3>
-                      {ytTabSidebar === 'mix' && ytRadioSugerencias.length > 0
-                        ? `✨ Mix Radio: ${ytRadioMixTitle || 'Artistas y Canciones Similares'}`
-                        : ytTabSidebar === 'artista' && ytRadioSugerencias.length > 0
-                          ? `🎤 Éxitos de ${videoActivoObj?.snippet?.channelTitle || ytSearchQuery || 'Artista'}`
-                          : ytBuscando
-                            ? `Buscando "${ytSearchQuery}"...`
-                            : ytSearchQuery.trim()
-                              ? `Resultados: ${ytSearchQuery}`
-                              : videoActivoObj
-                                ? `Mix: ${videoActivoObj.snippet.title}`
-                                : 'Videos sugeridos'}
+                      {ytTabSidebar === 'busqueda'
+                        ? ytBuscando
+                          ? `🔍 Buscando "${ytSearchQuery}" en YouTube...`
+                          : ytSearchQuery.trim()
+                            ? `Resultados: "${ytSearchQuery}"`
+                            : 'Resultados de Búsqueda'
+                        : ytTabSidebar === 'mix' && ytRadioSugerencias.length > 0
+                          ? `✨ Mix Radio: ${ytRadioMixTitle || 'Artistas y Canciones Similares'}`
+                          : ytTabSidebar === 'artista' && ytRadioSugerencias.length > 0
+                            ? `🎤 Éxitos de ${videoActivoObj?.snippet?.channelTitle || ytSearchQuery || 'Artista'}`
+                            : ytBuscando
+                              ? `Buscando "${ytSearchQuery}"...`
+                              : ytSearchQuery.trim()
+                                ? `Resultados: "${ytSearchQuery}"`
+                                : videoActivoObj
+                                  ? `Mix: ${videoActivoObj.snippet.title}`
+                                  : 'Videos sugeridos'}
                     </h3>
                   </div>
 
-                  {/* CHIPS DE MODOS DE REPRODUCCIÓN (MIX DE OTROS ARTISTAS, DEL MISMO ARTISTA, BÚSQUEDA) */}
+                  {/* CHIPS DE MODOS DE REPRODUCCIÓN (BÚSQUEDA EN VIVO, MIX DE OTROS ARTISTAS, DEL MISMO ARTISTA) */}
                   <div className="yt-sidebar-tabs-toggle">
+                    {(ytVideos.length > 0 || ytSearchQuery.trim()) && (
+                      <button
+                        className={`yt-tab-pill-btn ${ytTabSidebar === 'busqueda' ? 'active' : ''}`}
+                        onClick={() => setYtTabSidebar('busqueda')}
+                        title="Ver lista de búsqueda en vivo"
+                      >
+                        <ListMusic size={12} strokeWidth={2.4} /> Búsqueda ({ytVideos.length})
+                      </button>
+                    )}
+
                     <button
                       className={`yt-tab-pill-btn ${ytTabSidebar === 'mix' ? 'active' : ''}`}
                       onClick={() => {
@@ -3012,7 +3061,7 @@ export default function App() {
                       }}
                       title="Mix de YouTube con canciones de OTROS artistas similares y afines al género"
                     >
-                      <Sparkles size={12} strokeWidth={2.4} /> Mix (Otros Artistas) {ytTabSidebar === 'mix' && ytRadioSugerencias.length > 0 ? `(${ytRadioSugerencias.length})` : ''}
+                      <Sparkles size={12} strokeWidth={2.4} /> Mix (Otros Artistas) {ytRadioSugerencias.length > 0 ? `(${ytRadioSugerencias.length})` : ''}
                     </button>
 
                     <button
@@ -3028,35 +3077,33 @@ export default function App() {
                     >
                       <Mic size={12} strokeWidth={2.4} /> Del Artista {ytTabSidebar === 'artista' && ytRadioSugerencias.length > 0 ? `(${ytRadioSugerencias.length})` : ''}
                     </button>
-
-                    {ytVideos.length > 0 && (
-                      <button
-                        className={`yt-tab-pill-btn ${ytTabSidebar === 'busqueda' ? 'active' : ''}`}
-                        onClick={() => setYtTabSidebar('busqueda')}
-                        title="Ver lista de búsqueda original"
-                      >
-                        <ListMusic size={12} strokeWidth={2.4} /> Búsqueda ({ytVideos.length})
-                      </button>
-                    )}
                   </div>
 
                   <p>
-                    {ytCargandoRadio
-                      ? '⏳ Cargando Mix inteligente de YouTube...'
-                      : ytTabSidebar === 'mix' && ytRadioSugerencias.length > 0
-                        ? modoRadioYT
-                          ? '((•)) Mix de YouTube activo: Descubriendo canciones y otros artistas afines al género sin repetir'
-                          : 'Sugerencias de otros artistas similares y grandes éxitos de la época'
-                        : ytTabSidebar === 'artista' && ytRadioSugerencias.length > 0
-                          ? `Grandes éxitos y canciones más escuchadas de ${videoActivoObj?.snippet?.channelTitle || 'este artista'}`
-                          : ytSearchQuery.trim()
-                            ? `${ytVideos.length} videos encontrados en vivo`
-                            : 'Los mixes son playlists que crea YouTube para ti'}
+                    {ytTabSidebar === 'busqueda'
+                      ? ytBuscando
+                        ? 'Obteniendo resultados en tiempo real...'
+                        : `${ytVideos.length} videos encontrados en vivo para "${ytSearchQuery}"`
+                      : ytCargandoRadio
+                        ? '⏳ Cargando Mix inteligente de YouTube...'
+                        : ytTabSidebar === 'mix' && ytRadioSugerencias.length > 0
+                          ? modoRadioYT
+                            ? '((•)) Mix de YouTube activo: Descubriendo canciones y otros artistas afines al género sin repetir'
+                            : 'Sugerencias de otros artistas similares y grandes éxitos de la época'
+                          : ytTabSidebar === 'artista' && ytRadioSugerencias.length > 0
+                            ? `Grandes éxitos y canciones más escuchadas de ${videoActivoObj?.snippet?.channelTitle || 'este artista'}`
+                            : `${ytVideos.length} videos disponibles`}
                   </p>
                 </div>
 
                 <div className="yt-sidebar-list">
-                  {((ytTabSidebar !== 'busqueda' && ytRadioSugerencias.length > 0) ? ytRadioSugerencias : ytVideos).map((v, idx) => {
+                  {ytTabSidebar === 'busqueda' && ytBuscando && ytVideos.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '36px 12px', color: '#aaa', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                      <Loader2 size={26} className="icon-spin" style={{ color: '#ff0000' }} />
+                      <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Buscando "{ytSearchQuery}" en YouTube...</span>
+                    </div>
+                  ) : (
+                    (ytTabSidebar === 'busqueda' || ytRadioSugerencias.length === 0 ? ytVideos : ytRadioSugerencias).map((v, idx) => {
                     const vidId = v.id?.videoId || v.id;
                     const esActivo = vidId === currentVideo;
                     return (
@@ -3082,7 +3129,7 @@ export default function App() {
                         </div>
                       </div>
                     );
-                  })}
+                  }))}
                 </div>
               </aside>
             </div>
