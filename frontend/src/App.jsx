@@ -62,6 +62,46 @@ const PLAYLISTS_SPOTIFY_RECOMENDADAS = [
   { id: 'gruperas-rom', titulo: 'Gruperas y Románticas', desc: 'Los Acosta, Bronco, Temerarios y grandes ídolos', emoji: '🤠', color: 'linear-gradient(135deg, #f7971e, #ffd200)', query: 'Los Acosta Bronco Los Temerarios Los Bukis' }
 ];
 
+const PATRONES_NO_MUSICALES_CLIENTE = [
+  /audiolibro/i, /audio\s*libro/i, /audiobook/i, /audio\s*book/i,
+  /resumen\s+de(l)?\s+libro/i, /resumen\s+animado/i, /libro\s+completo/i,
+  /psicolog[ií]a/i, /maquiavelo/i, /maquiav[eé]lic/i, /robert\s+greene/i,
+  /48\s+leyes/i, /leyes\s+del\s+poder/i, /podcast/i, /episodio\s*\d+/i,
+  /conferencia/i, /ted\s*talk/i, /tedx/i, /tutorial/i, /curso/i, /clase\s+de/i,
+  /deja\s+de\s+perseguir/i, /ha(z|cer?)\s+que\s+/i, /obsesionen/i, /obsesione/i,
+  /error\s+invisible/i, /perder\s+atracci[oó]n/i, /s[eé]\s+el\s+estratega/i,
+  /c[oó]mo\s+(hacer|atraer|conquistar|seducir|controlar|volverte|actuar|hablar|ganar|enamorar)/i,
+  /arte\s+de\s+(generar|la\s+seducci[oó]n|la\s+guerra|enamorar|manipular|persuadir)/i,
+  /t[eé]cnicas\s+de\s+(seducci[oó]n|persuasi[oó]n|manipulaci[oó]n)/i,
+  /lenguaje\s+corporal/i, /meditaci[oó]n\s+guiada/i, /hipnosis/i, /afirmaciones/i,
+  /autoayuda/i, /superaci[oó]n\s+personal/i, /crecimiento\s+personal/i, /desarrollo\s+personal/i,
+  /estoic/i, /hombre\s+de\s+alto\s+valor/i, /macho\s+alfa/i, /mente\s+subconsciente/i,
+  /ley\s+de\s+atracci[oó]n/i, /documental/i, /documentary/i, /noticias/i, /noticiero/i,
+  /gameplay/i, /walkthrough/i
+];
+
+function esVideoMusical(v) {
+  if (!v) return false;
+  const title = v?.snippet?.title || v?.title || '';
+  const channel = v?.snippet?.channelTitle || v?.author?.name || '';
+  const duration = v?.snippet?.duration || v?.duration || v?.timestamp || '';
+  const texto = `${title} ${channel}`.toLowerCase();
+  for (const p of PATRONES_NO_MUSICALES_CLIENTE) {
+    if (p.test(texto)) return false;
+  }
+  if (duration && typeof duration === 'string' && duration.includes(':')) {
+    const parts = duration.split(':').map(Number);
+    let seg = 0;
+    if (parts.length === 3) seg = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    else if (parts.length === 2) seg = parts[0] * 60 + parts[1];
+    if (seg > 1500) {
+      const esLargaDuracionMusical = /\b(mix|remix|dj|set|sesi[oó]n|session|album|disco|concierto|concert|live|en vivo|megamix|enganchado)\b/i.test(texto);
+      if (!esLargaDuracionMusical) return false;
+    }
+  }
+  return true;
+}
+
 export default function App() {
   const [tab, setTab] = useState('cloud'); // 'cloud' | 'videos_nube' | 'youtube' | 'spotify' | 'favorites'
   
@@ -770,9 +810,20 @@ export default function App() {
         }
       });
       if (r.data?.items && r.data.items.length > 0) {
-        setYtRadioSugerencias(r.data.items);
-        if (r.data.mixTitle) setYtRadioMixTitle(r.data.mixTitle);
-        setYtTabSidebar(modo === 'artista' ? 'artista' : 'mix');
+        let limpios = r.data.items.filter(esVideoMusical);
+        if (limpios.length === 0 && (channel || title)) {
+          try {
+            const fallbackRes = await axios.get(`${API}/api/youtube/search`, {
+              params: { q: `${channel || title} canciones exitos` }
+            });
+            limpios = (fallbackRes.data?.items || []).filter(esVideoMusical);
+          } catch {}
+        }
+        if (limpios.length > 0) {
+          setYtRadioSugerencias(limpios);
+          if (r.data.mixTitle) setYtRadioMixTitle(r.data.mixTitle);
+          setYtTabSidebar(modo === 'artista' ? 'artista' : 'mix');
+        }
       }
     } catch (e) {
       console.warn('Error cargando sugerencias de Radio YouTube:', e);
@@ -804,10 +855,11 @@ export default function App() {
   const siguienteYouTube = () => {
     if (modoRadioYT) {
       // 1. MODO RADIO SUGERENCIAS / MIX ACTIVADO:
-      const pool =
+      const pool = (
         ytTabSidebar === 'busqueda' || ytRadioSugerencias.length === 0
           ? ytVideos
-          : ytRadioSugerencias;
+          : ytRadioSugerencias
+      ).filter(esVideoMusical);
 
       const noReproducidas = pool.filter(v => {
         const id = v.id?.videoId || v.id;
@@ -832,9 +884,10 @@ export default function App() {
     }
 
     // 2. MODO LISTA FIJA (modoRadioYT === false):
-    if (ytVideos.length > 0) {
-      const nuevoIndex = Math.min(ytIndex + 1, ytVideos.length - 1);
-      const elegida = ytVideos[nuevoIndex];
+    const listaFija = ytVideos.filter(esVideoMusical);
+    if (listaFija.length > 0) {
+      const nuevoIndex = (ytIndex + 1) % listaFija.length;
+      const elegida = listaFija[nuevoIndex];
       reproducirYouTube(elegida.id?.videoId || elegida.id, nuevoIndex, elegida);
     }
   };
@@ -877,7 +930,7 @@ export default function App() {
     axios.get(`${API}/api/youtube/search`, { params: { q: 'Grandes Exitos Musica Latina' } })
       .then(r => {
         if (r.data?.items) {
-          setYtVideos(r.data.items);
+          setYtVideos((r.data.items || []).filter(esVideoMusical));
           setYtTabSidebar('busqueda');
         }
       })
@@ -1292,7 +1345,7 @@ export default function App() {
 
     const cacheKey = q.toLowerCase();
     if (ytSearchCacheRef.current.has(cacheKey)) {
-      setYtVideos(ytSearchCacheRef.current.get(cacheKey));
+      setYtVideos((ytSearchCacheRef.current.get(cacheKey) || []).filter(esVideoMusical));
       setYtBuscando(false);
       return;
     }
@@ -1303,8 +1356,9 @@ export default function App() {
       try {
         const r = await axios.get(`${API}/api/youtube/search`, { params: { q } });
         if (!cancelado && r.data?.items) {
-          ytSearchCacheRef.current.set(cacheKey, r.data.items);
-          setYtVideos(r.data.items);
+          const limpios = (r.data.items || []).filter(esVideoMusical);
+          ytSearchCacheRef.current.set(cacheKey, limpios);
+          setYtVideos(limpios);
           setYtTabSidebar('busqueda');
         }
       } catch (e) {
@@ -1727,7 +1781,7 @@ export default function App() {
 
     try {
       const yt = await axios.get(`${API}/api/youtube/search`, { params: { q: search } });
-      setYtVideos(yt.data.items || []);
+      setYtVideos((yt.data.items || []).filter(esVideoMusical));
       setTab('youtube');
     } catch (e) {
       console.error(e);
@@ -1816,7 +1870,7 @@ export default function App() {
       setYtBuscando(true);
       const cacheKey = q.toLowerCase();
       if (ytSearchCacheRef.current.has(cacheKey)) {
-        setYtVideos(ytSearchCacheRef.current.get(cacheKey));
+        setYtVideos((ytSearchCacheRef.current.get(cacheKey) || []).filter(esVideoMusical));
         setYtTabSidebar('busqueda');
         setYtBuscando(false);
         return;
@@ -1824,8 +1878,9 @@ export default function App() {
       try {
         const r = await axios.get(`${API}/api/youtube/search`, { params: { q } });
         if (r.data?.items) {
-          ytSearchCacheRef.current.set(cacheKey, r.data.items);
-          setYtVideos(r.data.items);
+          const limpios = (r.data.items || []).filter(esVideoMusical);
+          ytSearchCacheRef.current.set(cacheKey, limpios);
+          setYtVideos(limpios);
           setYtTabSidebar('busqueda');
         }
       } catch (e) {
@@ -3083,16 +3138,16 @@ export default function App() {
                     {ytTabSidebar === 'busqueda'
                       ? ytBuscando
                         ? 'Obteniendo resultados en tiempo real...'
-                        : `${ytVideos.length} videos encontrados en vivo para "${ytSearchQuery}"`
+                        : `${ytVideos.filter(esVideoMusical).length} videos encontrados en vivo para "${ytSearchQuery}"`
                       : ytCargandoRadio
                         ? '⏳ Cargando Mix inteligente de YouTube...'
-                        : ytTabSidebar === 'mix' && ytRadioSugerencias.length > 0
+                        : ytTabSidebar === 'mix' && ytRadioSugerencias.filter(esVideoMusical).length > 0
                           ? modoRadioYT
                             ? '((•)) Mix de YouTube activo: Descubriendo canciones y otros artistas afines al género sin repetir'
                             : 'Sugerencias de otros artistas similares y grandes éxitos de la época'
-                          : ytTabSidebar === 'artista' && ytRadioSugerencias.length > 0
+                          : ytTabSidebar === 'artista' && ytRadioSugerencias.filter(esVideoMusical).length > 0
                             ? `Grandes éxitos y canciones más escuchadas de ${videoActivoObj?.snippet?.channelTitle || 'este artista'}`
-                            : `${ytVideos.length} videos disponibles`}
+                            : `${ytVideos.filter(esVideoMusical).length} videos disponibles`}
                   </p>
                 </div>
 
@@ -3103,7 +3158,9 @@ export default function App() {
                       <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Buscando "{ytSearchQuery}" en YouTube...</span>
                     </div>
                   ) : (
-                    (ytTabSidebar === 'busqueda' || ytRadioSugerencias.length === 0 ? ytVideos : ytRadioSugerencias).map((v, idx) => {
+                    (ytTabSidebar === 'busqueda' || ytRadioSugerencias.length === 0 ? ytVideos : ytRadioSugerencias)
+                      .filter(esVideoMusical)
+                      .map((v, idx) => {
                     const vidId = v.id?.videoId || v.id;
                     const esActivo = vidId === currentVideo;
                     return (

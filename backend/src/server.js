@@ -504,6 +504,85 @@ app.get('/api/spotify/radio', async (req, res) => {
   }
 });
 
+// Patrones estrictos para descartar audiolibros, autoayuda, conferencias, podcasts y contenido no musical
+const PATRONES_NO_MUSICALES = [
+  /audiolibro/i,
+  /audio\s*libro/i,
+  /audiobook/i,
+  /audio\s*book/i,
+  /resumen\s+de(l)?\s+libro/i,
+  /resumen\s+animado/i,
+  /libro\s+completo/i,
+  /cap[ií]tulo\s*\d+/i,
+  /psicolog[ií]a/i,
+  /maquiavelo/i,
+  /maquiav[eé]lic/i,
+  /robert\s+greene/i,
+  /48\s+leyes/i,
+  /leyes\s+del\s+poder/i,
+  /podcast/i,
+  /episodio\s*\d+/i,
+  /conferencia/i,
+  /ted\s*talk/i,
+  /tedx/i,
+  /tutorial/i,
+  /curso\s+completo/i,
+  /clase\s+de/i,
+  /c[oó]mo\s+(hacer|atraer|conquistar|seducir|controlar|volverte|actuar|hablar|ganar|enamorar)/i,
+  /arte\s+de\s+(generar|la\s+seducci[oó]n|la\s+guerra|enamorar|manipular|persuadir)/i,
+  /t[eé]cnicas\s+de\s+(seducci[oó]n|persuasi[oó]n|manipulaci[oó]n)/i,
+  /lenguaje\s+corporal/i,
+  /documental/i,
+  /documentary/i,
+  /noticias/i,
+  /noticiero/i,
+  /breaking\s+news/i,
+  /gameplay/i,
+  /walkthrough/i,
+  /playthrough/i,
+  /meditaci[oó]n\s+guiada/i,
+  /afirmaciones\s+positivas/i,
+  /afirmaciones/i,
+  /hipnosis/i,
+  /deja\s+de\s+perseguir/i,
+  /ha(z|cer?)\s+que\s+(cualquier\s+mujer|alguien|los\s+dem[aá]s|un\s+hombre|te\s+extra[ñn]e|se\s+obsesione)/i,
+  /obsesionen\s+mentalmente/i,
+  /obsesione/i,
+  /error\s+invisible/i,
+  /perder\s+atracci[oó]n/i,
+  /s[eé]\s+el\s+estratega/i,
+  /persuasi[oó]n/i,
+  /h[aá]bitos\s+at[oó]micos/i,
+  /superaci[oó]n\s+personal/i,
+  /autoayuda/i,
+  /crecimiento\s+personal/i,
+  /desarrollo\s+personal/i,
+  /estoic/i,
+  /hombre\s+de\s+alto\s+valor/i,
+  /macho\s+alfa/i,
+  /mente\s+subconsciente/i,
+  /ley\s+de\s+atracci[oó]n/i,
+  /reacci[oó]n\s+a\s+/i
+];
+
+function esContenidoMusical(title = '', channel = '', seconds = 0, timestamp = '') {
+  const texto = `${title} ${channel}`.toLowerCase();
+  for (const patron of PATRONES_NO_MUSICALES) {
+    if (patron.test(texto)) return false;
+  }
+  let seg = Number(seconds) || 0;
+  if (!seg && timestamp && timestamp.includes(':')) {
+    const parts = timestamp.split(':').map(Number);
+    if (parts.length === 3) seg = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    else if (parts.length === 2) seg = parts[0] * 60 + parts[1];
+  }
+  if (seg > 1500) {
+    const esMixOAlbum = /\b(mix|remix|dj|set|sesi[oó]n|session|album|disco|concierto|concert|live|en vivo|megamix)\b/i.test(texto);
+    if (!esMixOAlbum) return false;
+  }
+  return true;
+}
+
 // ---------- YouTube ----------
 app.get('/api/youtube/search', async (req, res) => {
   const query = String(req.query.q || '').trim();
@@ -520,24 +599,57 @@ app.get('/api/youtube/search', async (req, res) => {
       const ytResponse = await fetch(endpoint);
       const ytData = await ytResponse.json();
       if (ytData?.items) {
-        guardarEnCache(cacheYouTubeSearch, cacheKey, ytData);
-        return res.json(ytData);
+        const items = (ytData.items || []).filter(v =>
+          esContenidoMusical(v.snippet?.title, v.snippet?.channelTitle)
+        );
+        const payload = { items };
+        guardarEnCache(cacheYouTubeSearch, cacheKey, payload);
+        return res.json(payload);
       }
     }
 
-    // Si no hay API key configurada, busca directamente sin requerir credenciales
-    const r = await ytSearch(query);
-    const items = (r.videos || []).slice(0, 18).map(v => ({
-      id: { videoId: v.videoId },
-      snippet: {
-        title: v.title,
-        channelTitle: v.author?.name || 'YouTube',
-        duration: v.timestamp || '',
-        thumbnails: {
-          default: { url: v.thumbnail || v.image }
+    // Asegurar que la búsqueda tenga intención musical para evitar libros/audios de autoayuda
+    const tieneTerminoMusical = /\b(cancion|canciones|musica|music|song|songs|video|official|oficial|audio|lyrics|letra|album|disco|remix|live|en vivo|mix|vevo|ft|feat|banda|grupo|orquesta|dj)\b/i.test(query);
+    const queryBusqueda = tieneTerminoMusical ? query : `${query} cancion`;
+
+    const r = await ytSearch(queryBusqueda);
+    let items = (r.videos || [])
+      .filter(v => esContenidoMusical(v.title, v.author?.name, v.seconds, v.timestamp))
+      .slice(0, 18)
+      .map(v => ({
+        id: { videoId: v.videoId },
+        snippet: {
+          title: v.title,
+          channelTitle: v.author?.name || 'YouTube',
+          duration: v.timestamp || '',
+          thumbnails: {
+            default: { url: v.thumbnail || v.image }
+          }
         }
+      }));
+
+    // Si con 'cancion' trajo pocos resultados, buscar también directo y filtrar estrictamente
+    if (items.length < 4 && !tieneTerminoMusical) {
+      const r2 = await ytSearch(query);
+      const items2 = (r2.videos || [])
+        .filter(v => esContenidoMusical(v.title, v.author?.name, v.seconds, v.timestamp))
+        .slice(0, 18)
+        .map(v => ({
+          id: { videoId: v.videoId },
+          snippet: {
+            title: v.title,
+            channelTitle: v.author?.name || 'YouTube',
+            duration: v.timestamp || '',
+            thumbnails: {
+              default: { url: v.thumbnail || v.image }
+            }
+          }
+        }));
+      if (items2.length > items.length) {
+        items = items2;
       }
-    }));
+    }
+
     const payload = { items };
     guardarEnCache(cacheYouTubeSearch, cacheKey, payload);
     res.json(payload);
@@ -596,13 +708,17 @@ function fetchYouTubeMix(videoId) {
             for (const it of contents) {
               const p = it.playlistPanelVideoRenderer;
               if (!p || !p.videoId || vistos.has(p.videoId)) continue;
-              vistos.add(p.videoId);
               const title = p.title?.simpleText || p.title?.runs?.[0]?.text || '';
               const channelTitle =
                 p.shortBylineText?.runs?.[0]?.text ||
                 p.longBylineText?.runs?.[0]?.text ||
                 'YouTube';
               const duration = p.lengthText?.simpleText || '';
+
+              // Descartar audiolibros, autoayuda o contenido no musical
+              if (!esContenidoMusical(title, channelTitle, 0, duration)) continue;
+
+              vistos.add(p.videoId);
               const thumb =
                 p.thumbnail?.thumbnails?.[p.thumbnail.thumbnails.length - 1]?.url ||
                 p.thumbnail?.thumbnails?.[0]?.url ||
@@ -633,13 +749,17 @@ function fetchYouTubeMix(videoId) {
                   if (entry.compactVideoRenderer) {
                     const c = entry.compactVideoRenderer;
                     if (!c.videoId || vistos.has(c.videoId)) continue;
+                    const title = c.title?.simpleText || c.title?.runs?.[0]?.text || '';
+                    const channelTitle = c.shortBylineText?.runs?.[0]?.text || 'YouTube';
+                    const duration = c.lengthText?.simpleText || '';
+                    if (!esContenidoMusical(title, channelTitle, 0, duration)) continue;
                     vistos.add(c.videoId);
                     items.push({
                       id: { videoId: c.videoId },
                       snippet: {
-                        title: c.title?.simpleText || c.title?.runs?.[0]?.text || '',
-                        channelTitle: c.shortBylineText?.runs?.[0]?.text || 'YouTube',
-                        duration: c.lengthText?.simpleText || '',
+                        title,
+                        channelTitle,
+                        duration,
                         thumbnails: {
                           default: {
                             url:
@@ -657,12 +777,13 @@ function fetchYouTubeMix(videoId) {
                       lock.rendererContext?.commandContext?.onTap?.innertubeCommand
                         ?.watchEndpoint?.videoId;
                     if (!id || vistos.has(id)) continue;
-                    vistos.add(id);
                     const title = lock.metadata?.lockupMetadataViewModel?.title?.content || '';
                     const ch =
                       lock.metadata?.lockupMetadataViewModel?.metadata
                         ?.contentMetadataViewModel?.metadataRows?.[0]?.parts?.[0]?.text ||
                       'YouTube';
+                    if (!esContenidoMusical(title, ch)) continue;
+                    vistos.add(id);
                     const thumb =
                       lock.contentImage?.thumbnailViewModel?.image?.sources?.[0]?.url ||
                       `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
@@ -746,15 +867,18 @@ app.get('/api/youtube/radio', async (req, res) => {
       if (!mixResult.items || mixResult.items.length < 5) {
         const busquedaMix = `${artista || ''} canciones similares mix exitos`.trim();
         const rFallback = await ytSearch(busquedaMix);
-        const itemsFallback = (rFallback.videos || []).slice(0, 20).map(v => ({
-          id: { videoId: v.videoId },
-          snippet: {
-            title: v.title,
-            channelTitle: v.author?.name || 'YouTube',
-            duration: v.timestamp || '',
-            thumbnails: { default: { url: v.thumbnail || v.image } }
-          }
-        }));
+        const itemsFallback = (rFallback.videos || [])
+          .filter(v => esContenidoMusical(v.title, v.author?.name, v.seconds, v.timestamp))
+          .slice(0, 20)
+          .map(v => ({
+            id: { videoId: v.videoId },
+            snippet: {
+              title: v.title,
+              channelTitle: v.author?.name || 'YouTube',
+              duration: v.timestamp || '',
+              thumbnails: { default: { url: v.thumbnail || v.image } }
+            }
+          }));
         mixResult = {
           mixTitle: `Mix de Canciones y Artistas Similares`,
           items: itemsFallback
@@ -778,6 +902,7 @@ app.get('/api/youtube/radio', async (req, res) => {
     const items = [];
     for (const v of r.videos || []) {
       if (!v.videoId || vistos.has(v.videoId)) continue;
+      if (!esContenidoMusical(v.title, v.author?.name, v.seconds, v.timestamp)) continue;
       const claveTitulo = v.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 22);
       if (vistos.has(claveTitulo)) continue;
       vistos.add(v.videoId);
