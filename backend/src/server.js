@@ -323,6 +323,27 @@ app.get('/api/spotify/refresh_token', async (req, res) => {
 let spotifyServerToken = '';
 let spotifyServerTokenExp = 0;
 const cacheAudioSpotify = new Map();
+const cacheYouTubeSearch = new Map();
+const cacheYouTubeRadio = new Map();
+const cacheSpotifySearch = new Map();
+
+function guardarEnCache(mapa, clave, datos, maxItems = 150) {
+  if (mapa.size >= maxItems) {
+    const primeraClave = mapa.keys().next().value;
+    mapa.delete(primeraClave);
+  }
+  mapa.set(clave, { datos, tiempo: Date.now() });
+}
+
+function obtenerDeCache(mapa, clave, ttlMs = 25 * 60 * 1000) {
+  const item = mapa.get(clave);
+  if (!item) return null;
+  if (Date.now() - item.tiempo > ttlMs) {
+    mapa.delete(clave);
+    return null;
+  }
+  return item.datos;
+}
 
 async function obtenerTokenServidorSpotify() {
   if (spotifyServerToken && Date.now() < spotifyServerTokenExp) {
@@ -353,14 +374,19 @@ app.get('/api/spotify/search', async (req, res) => {
   const query = String(req.query.q || '').trim();
   if (!query) return res.json({ tracks: { items: [] } });
 
+  const cacheKey = query.toLowerCase();
+  const cached = obtenerDeCache(cacheSpotifySearch, cacheKey);
+  if (cached) return res.json(cached);
+
   try {
     const token = req.query.token || (await obtenerTokenServidorSpotify());
-    const endpoint = `https://api.spotify.com/v1/search?type=track&limit=10&q=${encodeURIComponent(query)}`;
+    const endpoint = `https://api.spotify.com/v1/search?type=track&limit=15&q=${encodeURIComponent(query)}`;
     const spResponse = await fetch(endpoint, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const spData = await spResponse.json();
     if (spData?.tracks?.items) {
+      guardarEnCache(cacheSpotifySearch, cacheKey, spData);
       return res.json(spData);
     }
   } catch (e) {
@@ -370,7 +396,7 @@ app.get('/api/spotify/search', async (req, res) => {
   // Respaldo automático si Spotify tarda o falla
   try {
     const r = await ytSearch(query);
-    const items = (r.videos || []).slice(0, 12).map(v => ({
+    const items = (r.videos || []).slice(0, 15).map(v => ({
       id: v.videoId,
       uri: `spotify:track:${v.videoId}`,
       name: v.title,
@@ -382,7 +408,9 @@ app.get('/api/spotify/search', async (req, res) => {
       },
       directVideoId: v.videoId
     }));
-    return res.json({ tracks: { items } });
+    const payload = { tracks: { items } };
+    guardarEnCache(cacheSpotifySearch, cacheKey, payload);
+    return res.json(payload);
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
@@ -418,21 +446,28 @@ app.get('/api/spotify/audio', async (req, res) => {
 
 // ---------- YouTube ----------
 app.get('/api/youtube/search', async (req, res) => {
-  const query = req.query.q;
+  const query = String(req.query.q || '').trim();
   if (!query) return res.json({ items: [] });
+
+  const cacheKey = query.toLowerCase();
+  const cached = obtenerDeCache(cacheYouTubeSearch, cacheKey);
+  if (cached) return res.json(cached);
 
   try {
     const apiKey = process.env.YOUTUBE_API_KEY;
     if (apiKey) {
-      const endpoint = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(query)}&key=${apiKey}`;
+      const endpoint = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=15&q=${encodeURIComponent(query)}&key=${apiKey}`;
       const ytResponse = await fetch(endpoint);
       const ytData = await ytResponse.json();
-      return res.json(ytData);
+      if (ytData?.items) {
+        guardarEnCache(cacheYouTubeSearch, cacheKey, ytData);
+        return res.json(ytData);
+      }
     }
 
     // Si no hay API key configurada, busca directamente sin requerir credenciales
     const r = await ytSearch(query);
-    const items = (r.videos || []).slice(0, 15).map(v => ({
+    const items = (r.videos || []).slice(0, 18).map(v => ({
       id: { videoId: v.videoId },
       snippet: {
         title: v.title,
@@ -443,10 +478,89 @@ app.get('/api/youtube/search', async (req, res) => {
         }
       }
     }));
-    res.json({ items });
+    const payload = { items };
+    guardarEnCache(cacheYouTubeSearch, cacheKey, payload);
+    res.json(payload);
   } catch (err) {
     console.error('Error buscando en YouTube:', err.message);
     res.status(500).json({ error: 'Error al buscar en YouTube' });
+  }
+});
+
+// Endpoint exclusivo para Radio de Sugerencias y Coincidencias de YouTube
+// Genera variedad de canciones del artista/género sin repetir la misma canción una y otra vez
+app.get('/api/youtube/radio', async (req, res) => {
+  const query = String(req.query.q || '').trim();
+  const currentTitle = String(req.query.title || '').trim().toLowerCase();
+  const excludeId = String(req.query.excludeId || '').trim();
+
+  if (!query && !currentTitle) return res.json({ items: [] });
+
+  const cacheKey = `${query}__${currentTitle}__${excludeId}`.toLowerCase();
+  const cached = obtenerDeCache(cacheYouTubeRadio, cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    // 1. Limpiar artista y título de la canción para buscar coincidencias reales
+    let artista = query;
+    let temaExcluir = '';
+
+    if (currentTitle) {
+      const partes = currentTitle.split(/[-–—:]/);
+      if (partes.length > 1) {
+        if (!artista || artista.length < 3) artista = partes[0].trim();
+        temaExcluir = partes.slice(1).join(' ').trim().replace(/\(.*?\)|\[.*?\]/g, '').trim().toLowerCase();
+      } else {
+        temaExcluir = currentTitle.replace(/\(.*?\)|\[.*?\]/g, '').trim().toLowerCase();
+      }
+    }
+
+    temaExcluir = temaExcluir.replace(/official|video|audio|lyrics|letra|remastered|hd|4k|en vivo|live/gi, '').trim();
+
+    // 2. Buscar canciones variadas y grandes éxitos del artista
+    const busquedaRadio = `${artista || query} canciones grandes exitos`.trim();
+    const r = await ytSearch(busquedaRadio);
+
+    const vistos = new Set();
+    if (excludeId) vistos.add(excludeId);
+
+    const items = [];
+    for (const v of r.videos || []) {
+      if (!v.videoId || vistos.has(v.videoId)) continue;
+
+      const tituloMin = v.title.toLowerCase();
+      // Si el video actual es "Seducción", excluimos otros videos que solo sean duplicados de "Seducción"
+      if (temaExcluir && temaExcluir.length > 3 && tituloMin.includes(temaExcluir)) {
+        continue;
+      }
+
+      const claveTitulo = v.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 22);
+      if (vistos.has(claveTitulo)) continue;
+
+      vistos.add(v.videoId);
+      vistos.add(claveTitulo);
+
+      items.push({
+        id: { videoId: v.videoId },
+        snippet: {
+          title: v.title,
+          channelTitle: v.author?.name || 'YouTube',
+          duration: v.timestamp || '',
+          thumbnails: {
+            default: { url: v.thumbnail || v.image }
+          }
+        }
+      });
+
+      if (items.length >= 20) break;
+    }
+
+    const payload = { items };
+    guardarEnCache(cacheYouTubeRadio, cacheKey, payload);
+    res.json(payload);
+  } catch (err) {
+    console.error('Error generando Radio de YouTube:', err.message);
+    res.status(500).json({ error: 'Error al generar radio de sugerencias' });
   }
 });
 
